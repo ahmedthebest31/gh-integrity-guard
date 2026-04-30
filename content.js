@@ -45,9 +45,50 @@ const createIntegrityCard = () => {
 };
 
 /**
+ * Updates the UI with the fetched or cached score.
+ * @param {Object} scoreData
+ */
+const updateCardWithScore = (scoreData) => {
+  const card = document.getElementById(INTEGRITY_CARD_ID);
+  if (!card) return;
+  
+  const scoreSpan = card.querySelector('span[style*="font-size: 24px"]');
+  const statusP = card.querySelector('p');
+  const pendingSpan = card.querySelector('.color-fg-muted.text-small');
+  
+  if (scoreSpan && statusP && pendingSpan) {
+    scoreSpan.textContent = `${scoreData.score}/100`;
+    statusP.textContent = scoreData.status;
+    pendingSpan.textContent = 'Calculated';
+    
+    // Apply basic color logic based on PRD
+    if (scoreData.score < 40) {
+      scoreSpan.style.color = 'var(--color-danger-fg)';
+    } else if (scoreData.score <= 70) {
+      scoreSpan.style.color = 'var(--color-attention-fg)';
+    } else {
+      scoreSpan.style.color = 'var(--color-success-fg)';
+    }
+  }
+};
+
+/**
+ * Simulates fetching data from GitHub.
+ * @returns {Promise<Object>}
+ */
+const fetchGitHubData = async (repoFullName) => {
+  // In reality, this would fetch from GitHub API and calculate the score
+  return new Promise(resolve => {
+    setTimeout(() => {
+      resolve({ score: Math.floor(Math.random() * 100), status: "Organic Activity" });
+    }, 1000);
+  });
+};
+
+/**
  * Injects the Integrity Score card into the GitHub repository sidebar.
  */
-const injectCardIntoSidebar = () => {
+const injectCardIntoSidebar = async () => {
   const sidebar = document.querySelector('.Layout-sidebar');
   
   // Exit if not on a repository page (no sidebar) or if already injected
@@ -62,6 +103,36 @@ const injectCardIntoSidebar = () => {
     sidebar.insertBefore(card, sidebar.firstChild);
   } else {
     sidebar.appendChild(card);
+  }
+
+  try {
+    // Dynamically import the storage module
+    const storageUrl = chrome.runtime.getURL('storage.js');
+    const StorageUtil = await import(storageUrl);
+
+    // Extract repo full name from URL (e.g., 'owner/repo')
+    const pathParts = window.location.pathname.split('/').filter(Boolean);
+    if (pathParts.length >= 2) {
+      const repoFullName = `${pathParts[0]}/${pathParts[1]}`;
+      const cacheKey = `repo_score_${repoFullName}`;
+
+      // Check local cache using getWithExpiry
+      let scoreData = await StorageUtil.getWithExpiry(cacheKey);
+
+      if (scoreData) {
+        console.log(`[gh-integrity-guard] Using cached score for ${repoFullName}`);
+        updateCardWithScore(scoreData);
+      } else {
+        console.log(`[gh-integrity-guard] Fetching new score for ${repoFullName}`);
+        scoreData = await fetchGitHubData(repoFullName);
+        
+        // Store in cache with 24h TTL
+        await StorageUtil.setWithExpiry(cacheKey, scoreData, 1440);
+        updateCardWithScore(scoreData);
+      }
+    }
+  } catch (error) {
+    console.error('[gh-integrity-guard] Error processing score:', error);
   }
 };
 
