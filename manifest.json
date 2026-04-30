@@ -24,7 +24,8 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "storage.js"
+        "storage.js",
+        "github-service.js"
       ],
       "matches": [
         "https://github.com/*"

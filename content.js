@@ -73,24 +73,37 @@ const updateCardWithScore = (scoreData) => {
 };
 
 /**
- * Simulates fetching data from GitHub.
- * @returns {Promise<Object>}
+ * Maps GitHubApiError status codes to user-friendly card messages.
+ * @param {Error} error
+ * @returns {{ score: string, status: string }}
  */
-const fetchGitHubData = async (repoFullName) => {
-  // In reality, this would fetch from GitHub API and calculate the score
-  return new Promise(resolve => {
-    setTimeout(() => {
-      resolve({ score: Math.floor(Math.random() * 100), status: "Organic Activity" });
-    }, 1000);
-  });
+const buildErrorDisplay = (error) => {
+  if (error.name === 'GitHubApiError') {
+    switch (error.status) {
+      case 401:
+        return { score: '!', status: 'Invalid token — check Options page' };
+      case 403:
+      case 429: {
+        const retry = error.retryAfter ? ` (resets in ${error.retryAfter}s)` : '';
+        return { score: '!', status: `Rate limited${retry}` };
+      }
+      case 404:
+        return { score: 'N/A', status: 'Repository not found' };
+      default:
+        return { score: '!', status: `API error (${error.status})` };
+    }
+  }
+  return { score: '!', status: 'Unexpected error' };
 };
 
 /**
  * Injects the Integrity Score card into the GitHub repository sidebar.
+ * Follows a cache-first strategy: reads from chrome.storage.local before
+ * making any network requests to the GitHub API.
  */
 const injectCardIntoSidebar = async () => {
   const sidebar = document.querySelector('.Layout-sidebar');
-  
+
   // Exit if not on a repository page (no sidebar) or if already injected
   if (!sidebar || document.getElementById(INTEGRITY_CARD_ID)) {
     return;
@@ -105,34 +118,45 @@ const injectCardIntoSidebar = async () => {
     sidebar.appendChild(card);
   }
 
+  // Extract owner/repo from the URL path
+  const pathParts = window.location.pathname.split('/').filter(Boolean);
+  if (pathParts.length < 2) return;
+
+  const [owner, repo] = pathParts;
+  const repoFullName = `${owner}/${repo}`;
+  const cacheKey = `repo_score_${repoFullName}`;
+
   try {
-    // Dynamically import the storage module
+    // Dynamically import modules (content scripts can't use static imports)
     const storageUrl = chrome.runtime.getURL('storage.js');
-    const StorageUtil = await import(storageUrl);
+    const serviceUrl = chrome.runtime.getURL('github-service.js');
+    const [StorageUtil, GitHubService] = await Promise.all([
+      import(storageUrl),
+      import(serviceUrl),
+    ]);
 
-    // Extract repo full name from URL (e.g., 'owner/repo')
-    const pathParts = window.location.pathname.split('/').filter(Boolean);
-    if (pathParts.length >= 2) {
-      const repoFullName = `${pathParts[0]}/${pathParts[1]}`;
-      const cacheKey = `repo_score_${repoFullName}`;
+    // ── 1. Cache check ──────────────────────────────────────────────────────
+    const cached = await StorageUtil.getWithExpiry(cacheKey);
 
-      // Check local cache using getWithExpiry
-      let scoreData = await StorageUtil.getWithExpiry(cacheKey);
-
-      if (scoreData) {
-        console.log(`[gh-integrity-guard] Using cached score for ${repoFullName}`);
-        updateCardWithScore(scoreData);
-      } else {
-        console.log(`[gh-integrity-guard] Fetching new score for ${repoFullName}`);
-        scoreData = await fetchGitHubData(repoFullName);
-        
-        // Store in cache with 24h TTL
-        await StorageUtil.setWithExpiry(cacheKey, scoreData, 1440);
-        updateCardWithScore(scoreData);
-      }
+    if (cached) {
+      console.log(`[gh-integrity-guard] Cache hit for ${repoFullName}`);
+      updateCardWithScore(cached);
+      return;
     }
+
+    // ── 2. Fetch from GitHub API ────────────────────────────────────────────
+    console.log(`[gh-integrity-guard] Cache miss — fetching data for ${repoFullName}`);
+    const repoData = await GitHubService.fetchRepoMetadata(owner, repo);
+
+    // ── 3. Calculate score ──────────────────────────────────────────────────
+    const scoreData = GitHubService.calculateTrustScore(repoData);
+
+    // ── 4. Persist to cache with 24-hour TTL ────────────────────────────────
+    await StorageUtil.setWithExpiry(cacheKey, scoreData, 1440);
+    updateCardWithScore(scoreData);
   } catch (error) {
-    console.error('[gh-integrity-guard] Error processing score:', error);
+    console.error(`[gh-integrity-guard] Failed to process ${repoFullName}:`, error);
+    updateCardWithScore(buildErrorDisplay(error));
   }
 };
 
