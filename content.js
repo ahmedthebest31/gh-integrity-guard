@@ -15,8 +15,32 @@ const CARD_STYLES = {
     padding: 16px;
     margin-top: 16px;
     margin-bottom: 16px;
-    background-color: var(--color-canvas-subtle);
+    // DEBUG: REMOVE THIS BACKGROUND AFTER TESTING
+    background-color: #ffffff !important;
     color: var(--color-fg-default);
+  `,
+  floating: `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    width: 320px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    border: 1px solid var(--color-border-default);
+    border-radius: 6px;
+    padding: 16px;
+    // DEBUG: REMOVE THIS BACKGROUND AFTER TESTING
+    background-color: #ffffff !important;
+    color: var(--color-fg-default);
+  `,
+  closeBtn: `
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    color: var(--color-fg-muted);
+    padding: 0 4px;
+    line-height: 1;
   `,
   scoreBox: `
     background-color: var(--color-canvas-default);
@@ -62,23 +86,31 @@ const CARD_STYLES = {
 
 /**
  * Creates the DOM element for the Integrity Score card.
+ * @param {boolean} isFloating - If true, renders as a fixed floating widget.
  * @returns {HTMLElement} The constructed card element.
  */
-const createIntegrityCard = () => {
+const createIntegrityCard = (isFloating = false) => {
   const card = document.createElement('div');
   card.id = INTEGRITY_CARD_ID;
 
-  card.className = 'BorderGrid-row';
+  card.className = isFloating ? '' : 'BorderGrid-row';
   card.setAttribute('role', 'region');
   card.setAttribute('aria-label', 'GitHub Integrity Guard — Trust Score');
   card.setAttribute('aria-live', 'polite');
-  card.style.cssText = CARD_STYLES.wrapper;
+  card.style.cssText = isFloating ? CARD_STYLES.floating : CARD_STYLES.wrapper;
+
+  const closeBtnHtml = isFloating
+    ? `<button data-ig-close style="${CARD_STYLES.closeBtn}" aria-label="Close Integrity Score" title="Close">✕</button>`
+    : '';
 
   card.innerHTML = `
     <div class="BorderGrid-cell">
       <h2 class="h4 mb-2 d-flex flex-justify-between flex-items-center">
         <span>🛡️ Integrity Score</span>
-        <span data-ig-status class="color-fg-muted text-small">Pending</span>
+        <span style="display:flex;align-items:center;gap:6px;">
+          <span data-ig-status class="color-fg-muted text-small">Pending</span>
+          ${closeBtnHtml}
+        </span>
       </h2>
 
       <!-- Score display -->
@@ -89,33 +121,10 @@ const createIntegrityCard = () => {
 
       <!-- Metric breakdown -->
       <div data-ig-breakdown style="margin-top: 10px; display: none;">
-        <div style="${CARD_STYLES.metricRow}">
-          <span>Forks / Stars</span>
-          <div style="display: flex; align-items: center;">
-            <span data-ig-forks-pts></span>
-            <div style="${CARD_STYLES.progressTrack}">
-              <div data-ig-forks-bar style="height: 100%; border-radius: 3px;"></div>
-            </div>
-          </div>
-        </div>
-        <div style="${CARD_STYLES.metricRow}">
-          <span>Commit Activity</span>
-          <div style="display: flex; align-items: center;">
-            <span data-ig-commits-pts></span>
-            <div style="${CARD_STYLES.progressTrack}">
-              <div data-ig-commits-bar style="height: 100%; border-radius: 3px;"></div>
-            </div>
-          </div>
-        </div>
-        <div style="${CARD_STYLES.metricRow}">
-          <span>Issue Health</span>
-          <div style="display: flex; align-items: center;">
-            <span data-ig-issues-pts></span>
-            <div style="${CARD_STYLES.progressTrack}">
-              <div data-ig-issues-bar style="height: 100%; border-radius: 3px;"></div>
-            </div>
-          </div>
-        </div>
+        <div style="${CARD_STYLES.metricRow}"><span>Forks / Stars</span><div style="display:flex;align-items:center;"><span data-ig-forks-pts></span><div style="${CARD_STYLES.progressTrack}"><div data-ig-forks-bar style="height:100%;border-radius:3px;"></div></div></div></div>
+        <div style="${CARD_STYLES.metricRow}"><span>Commit Activity</span><div style="display:flex;align-items:center;"><span data-ig-commits-pts></span><div style="${CARD_STYLES.progressTrack}"><div data-ig-commits-bar style="height:100%;border-radius:3px;"></div></div></div></div>
+        <div style="${CARD_STYLES.metricRow}"><span>Issue Health</span><div style="display:flex;align-items:center;"><span data-ig-issues-pts></span><div style="${CARD_STYLES.progressTrack}"><div data-ig-issues-bar style="height:100%;border-radius:3px;"></div></div></div></div>
+        <div style="${CARD_STYLES.metricRow}"><span>Discussion</span><div style="display:flex;align-items:center;"><span data-ig-discussion-pts></span><div style="${CARD_STYLES.progressTrack}"><div data-ig-discussion-bar style="height:100%;border-radius:3px;"></div></div></div></div>
       </div>
 
       <!-- Red flag banner -->
@@ -127,6 +136,14 @@ const createIntegrityCard = () => {
       <span data-ig-sr-summary class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;"></span>
     </div>
   `;
+
+  // Wire close button if floating
+  if (isFloating) {
+    const closeBtn = card.querySelector('[data-ig-close]');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => card.remove());
+    }
+  }
 
   return card;
 };
@@ -208,19 +225,25 @@ const updateCardWithScore = (scoreData) => {
   if (breakdownEl) {
     breakdownEl.style.display = 'block';
 
-    const forksPts   = $('[data-ig-forks-pts]');
-    const forksBar   = $('[data-ig-forks-bar]');
-    const commitsPts = $('[data-ig-commits-pts]');
-    const commitsBar = $('[data-ig-commits-bar]');
-    const issuesPts  = $('[data-ig-issues-pts]');
-    const issuesBar  = $('[data-ig-issues-bar]');
+    const forksPts      = $('[data-ig-forks-pts]');
+    const forksBar      = $('[data-ig-forks-bar]');
+    const commitsPts    = $('[data-ig-commits-pts]');
+    const commitsBar    = $('[data-ig-commits-bar]');
+    const issuesPts     = $('[data-ig-issues-pts]');
+    const issuesBar     = $('[data-ig-issues-bar]');
+    const discussionPts = $('[data-ig-discussion-pts]');
+    const discussionBar = $('[data-ig-discussion-bar]');
 
-    if (forksPts)   forksPts.textContent   = `${breakdown.forks.points}/${breakdown.forks.max}`;
-    if (forksBar)   fillBar(forksBar,   breakdown.forks.points,   breakdown.forks.max,   cssColor);
-    if (commitsPts) commitsPts.textContent = `${breakdown.commits.points}/${breakdown.commits.max}`;
-    if (commitsBar) fillBar(commitsBar, breakdown.commits.points, breakdown.commits.max, cssColor);
-    if (issuesPts)  issuesPts.textContent  = `${breakdown.issues.points}/${breakdown.issues.max}`;
-    if (issuesBar)  fillBar(issuesBar,  breakdown.issues.points,  breakdown.issues.max,  cssColor);
+    if (forksPts)      forksPts.textContent      = `${breakdown.forks.points}/${breakdown.forks.max}`;
+    if (forksBar)      fillBar(forksBar,      breakdown.forks.points,      breakdown.forks.max,      cssColor);
+    if (commitsPts)    commitsPts.textContent    = `${breakdown.commits.points}/${breakdown.commits.max}`;
+    if (commitsBar)    fillBar(commitsBar,    breakdown.commits.points,    breakdown.commits.max,    cssColor);
+    if (issuesPts)     issuesPts.textContent     = `${breakdown.issues.points}/${breakdown.issues.max}`;
+    if (issuesBar)     fillBar(issuesBar,     breakdown.issues.points,     breakdown.issues.max,     cssColor);
+    if (breakdown.discussion) {
+      if (discussionPts) discussionPts.textContent = `${breakdown.discussion.points}/${breakdown.discussion.max}`;
+      if (discussionBar) fillBar(discussionBar, breakdown.discussion.points, breakdown.discussion.max, cssColor);
+    }
   }
 
   // Red Flag banner
@@ -228,15 +251,20 @@ const updateCardWithScore = (scoreData) => {
     redFlagEl.style.display = 'block';
   }
 
-  // Screen reader summary
   if (srSummary) {
-    srSummary.textContent = [
+    const parts = [
       `Trust Score: ${score} out of 100, rated ${label}.`,
       `Fork to Star ratio scored ${breakdown.forks.points} of ${breakdown.forks.max}: ${breakdown.forks.note}.`,
       `Commit activity scored ${breakdown.commits.points} of ${breakdown.commits.max}: ${breakdown.commits.note}.`,
       `Issue health scored ${breakdown.issues.points} of ${breakdown.issues.max}: ${breakdown.issues.note}.`,
-      redFlag ? 'Red flag: abnormally low fork ratio for a popular repository.' : '',
-    ].filter(Boolean).join(' ');
+    ];
+    if (breakdown.discussion) {
+      parts.push(`Discussion depth scored ${breakdown.discussion.points} of ${breakdown.discussion.max}: ${breakdown.discussion.note}.`);
+    }
+    if (redFlag) {
+      parts.push('Red flag: abnormally low fork ratio for a popular repository.');
+    }
+    srSummary.textContent = parts.join(' ');
   }
 };
 
@@ -266,24 +294,27 @@ const buildErrorDisplay = (error) => {
 
 /**
  * Injects the Integrity Score card into the GitHub repository sidebar.
- * Follows a cache-first strategy: reads from chrome.storage.local before
- * making any network requests to the GitHub API.
+ * Falls back to a floating widget if .Layout-sidebar is not found.
+ * Follows a cache-first strategy before making API requests.
  */
 const injectCardIntoSidebar = async () => {
+  // Exit if already injected
+  if (document.getElementById(INTEGRITY_CARD_ID)) return;
+
   const sidebar = document.querySelector('.Layout-sidebar');
+  const isFloating = !sidebar;
+  const card = createIntegrityCard(isFloating);
 
-  // Exit if not on a repository page (no sidebar) or if already injected
-  if (!sidebar || document.getElementById(INTEGRITY_CARD_ID)) {
-    return;
-  }
-
-  const card = createIntegrityCard();
-
-  // Inject at the top of the sidebar
-  if (sidebar.firstChild) {
-    sidebar.insertBefore(card, sidebar.firstChild);
+  if (sidebar) {
+    // Inject at the top of the sidebar
+    if (sidebar.firstChild) {
+      sidebar.insertBefore(card, sidebar.firstChild);
+    } else {
+      sidebar.appendChild(card);
+    }
   } else {
-    sidebar.appendChild(card);
+    // No sidebar — inject as floating element
+    document.body.appendChild(card);
   }
 
   // Extract owner/repo from the URL path

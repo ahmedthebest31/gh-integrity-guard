@@ -133,10 +133,11 @@ const request = async (endpoint, token) => {
 /**
  * Fetches all repository metadata required by the scoring algorithm.
  *
- * Makes three parallel-where-possible requests:
+ * Makes parallel requests:
  *   1. GET /repos/:owner/:repo          → stars, forks, watchers, open_issues
  *   2. GET /repos/:owner/:repo/commits  → recent commit count (last 90 days)
  *   3. GET /search/issues               → closed issue count
+ *   4. GET /repos/:owner/:repo/issues   → recent issues with comment counts
  *
  * @param {string} owner - Repository owner (user or org).
  * @param {string} repo  - Repository name.
@@ -151,12 +152,18 @@ export const fetchRepoMetadata = async (owner, repo) => {
   ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
   const sinceISO = ninetyDaysAgo.toISOString();
 
-  // Fire all three requests concurrently to minimise latency
-  const [repoInfo, recentCommits, closedIssuesResult] = await Promise.all([
+  // Fire all requests concurrently to minimise latency
+  const [repoInfo, recentCommits, closedIssuesResult, recentIssues] = await Promise.all([
     request(`/repos/${owner}/${repo}`, token),
     request(`/repos/${owner}/${repo}/commits?since=${sinceISO}&per_page=100`, token),
     request(`/search/issues?q=repo:${owner}/${repo}+type:issue+state:closed&per_page=1`, token),
+    request(`/repos/${owner}/${repo}/issues?state=all&sort=updated&per_page=30`, token),
   ]);
+
+  // Calculate average comments per issue from the 30 most recently updated
+  const issueList = Array.isArray(recentIssues) ? recentIssues : [];
+  const totalComments = issueList.reduce((sum, issue) => sum + (issue.comments ?? 0), 0);
+  const avgCommentsPerIssue = issueList.length > 0 ? totalComments / issueList.length : 0;
 
   return {
     owner,
@@ -167,6 +174,7 @@ export const fetchRepoMetadata = async (owner, repo) => {
     openIssues: repoInfo.open_issues_count ?? 0,
     closedIssues: closedIssuesResult.total_count ?? 0,
     recentCommitsCount: Array.isArray(recentCommits) ? recentCommits.length : 0,
+    avgCommentsPerIssue,
   };
 };
 
@@ -175,9 +183,10 @@ export const fetchRepoMetadata = async (owner, repo) => {
 const WEIGHT_FORKS = 40;
 const WEIGHT_COMMITS = 30;
 const WEIGHT_ISSUES = 30;
+const BONUS_DISCUSSION = 10;
 
-const RED_FLAG_STAR_THRESHOLD = 5000;
-const RED_FLAG_RATIO_CEILING = 0.02;
+const RED_FLAG_STAR_THRESHOLD = 10000;
+const RED_FLAG_RATIO_CEILING = 0.03;
 const RED_FLAG_MAX_SCORE = 30;
 
 // ─── Individual Metric Scorers ───────────────────────────────────────────────
@@ -274,6 +283,34 @@ const scoreIssueHealth = (openIssues, closedIssues) => {
 };
 
 /**
+ * Scores issue discussion depth (bonus up to 10 pts).
+ *
+ * Rationale:
+ *   avgComments = total comments across 30 recent issues / issue count
+ *   - avgComments ≥ 3  → full 10 pts  (active, engaged community)
+ *   - avgComments = 0  → 0 pts
+ *   - else             → linear scale
+ *
+ * This bonus rewards repos where issues generate real discussion,
+ * regardless of whether those issues are open or closed.
+ *
+ * @param {number} avgCommentsPerIssue
+ * @returns {{ points: number, avg: number, note: string }}
+ */
+const scoreDiscussionDepth = (avgCommentsPerIssue) => {
+  if (avgCommentsPerIssue === 0) {
+    return { points: 0, avg: 0, note: 'No issue discussion detected' };
+  }
+
+  if (avgCommentsPerIssue >= 3) {
+    return { points: BONUS_DISCUSSION, avg: avgCommentsPerIssue, note: 'Active community discussion' };
+  }
+
+  const points = Math.round((avgCommentsPerIssue / 3) * BONUS_DISCUSSION);
+  return { points, avg: avgCommentsPerIssue, note: 'Some community engagement' };
+};
+
+/**
  * Maps a numeric score to a PRD-defined color and human label.
  * @param {number} score
  * @returns {{ color: string, label: string }}
@@ -289,27 +326,31 @@ const mapScoreToColor = (score) => {
 /**
  * Calculates the Trust Score (0-100) from repository metadata.
  *
- * Weights:
- *   Fork-to-Star Ratio  — 40 %
- *   Commit Activity      — 30 %
- *   Issue Resolution     — 30 %
+ * Core Weights (100 pts max):
+ *   Fork-to-Star Ratio  — 40 pts
+ *   Commit Activity      — 30 pts
+ *   Issue Resolution     — 30 pts
+ *
+ * Bonus (up to +10 pts, clamped to 100):
+ *   Discussion Depth     — 10 pts
  *
  * Red Flag:
- *   If stars > 5 000 AND (forks / stars) < 2 %, the final score is capped
+ *   If stars > 10 000 AND (forks / stars) < 3 %, the final score is capped
  *   at 30 regardless of other metrics (Danger Zone).
  *
  * @param {Object} data - The metadata object returned by fetchRepoMetadata.
  * @returns {{ score: number, color: string, label: string, breakdown: Object }}
  */
 export const calculateTrustScore = (data) => {
-  const { stars, forks, recentCommitsCount, openIssues, closedIssues } = data;
+  const { stars, forks, recentCommitsCount, openIssues, closedIssues, avgCommentsPerIssue = 0 } = data;
 
   // ── Individual metric scores ──
-  const forkScore   = scoreForkToStar(stars, forks);
-  const commitScore = scoreCommitActivity(recentCommitsCount);
-  const issueScore  = scoreIssueHealth(openIssues, closedIssues);
+  const forkScore       = scoreForkToStar(stars, forks);
+  const commitScore     = scoreCommitActivity(recentCommitsCount);
+  const issueScore      = scoreIssueHealth(openIssues, closedIssues);
+  const discussionScore = scoreDiscussionDepth(avgCommentsPerIssue);
 
-  let totalScore = forkScore.points + commitScore.points + issueScore.points;
+  let totalScore = forkScore.points + commitScore.points + issueScore.points + discussionScore.points;
 
   // ── Red Flag detection ──
   let redFlag = false;
@@ -329,9 +370,10 @@ export const calculateTrustScore = (data) => {
     label,
     redFlag,
     breakdown: {
-      forks:   { points: forkScore.points,   max: WEIGHT_FORKS,   ratio: forkScore.ratio,        note: forkScore.note   },
-      commits: { points: commitScore.points,  max: WEIGHT_COMMITS, count: commitScore.count,       note: commitScore.note },
-      issues:  { points: issueScore.points,   max: WEIGHT_ISSUES,  closedRatio: issueScore.closedRatio, note: issueScore.note  },
+      forks:      { points: forkScore.points,       max: WEIGHT_FORKS,      ratio: forkScore.ratio,              note: forkScore.note       },
+      commits:    { points: commitScore.points,      max: WEIGHT_COMMITS,    count: commitScore.count,             note: commitScore.note     },
+      issues:     { points: issueScore.points,       max: WEIGHT_ISSUES,     closedRatio: issueScore.closedRatio,  note: issueScore.note      },
+      discussion: { points: discussionScore.points,  max: BONUS_DISCUSSION,  avg: discussionScore.avg,             note: discussionScore.note },
     },
   };
 };

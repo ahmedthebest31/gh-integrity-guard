@@ -5,11 +5,15 @@
   "description": "Provides instant transparency regarding the authenticity and health of GitHub repositories.",
   "permissions": [
     "storage",
-    "declarativeContent"
+    "declarativeContent",
+    "tabs"
   ],
   "host_permissions": [
     "https://github.com/*"
   ],
+  "action": {
+    "default_popup": "popup.html"
+  },
   "content_scripts": [
     {
       "matches": [
