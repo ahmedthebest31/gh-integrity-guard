@@ -1,13 +1,16 @@
 /**
  * @fileoverview Content script for GitHub Integrity Guard.
- * Injects a placeholder Trust Score card into the GitHub repository sidebar.
+ * Injects a Trust Score card into the GitHub repository sidebar, with a
+ * floating bottom-right fallback for small screens or missing sidebar.
+ * Includes a Copy-to-Clipboard button with full accessibility support.
  */
 
 const INTEGRITY_CARD_ID = 'gh-integrity-guard-card';
+const SIDEBAR_WAIT_MS = 3000;
+const SMALL_SCREEN_PX = 768;
 
-/**
- * Inline style constants reused across the card.
- */
+// ─── Styles ──────────────────────────────────────────────────────────────────
+
 const CARD_STYLES = {
   wrapper: `
     border: 1px solid var(--color-border-default);
@@ -15,23 +18,25 @@ const CARD_STYLES = {
     padding: 16px;
     margin-top: 16px;
     margin-bottom: 16px;
-    // DEBUG: REMOVE THIS BACKGROUND AFTER TESTING
-    background-color: #ffffff !important;
+    background-color: var(--color-canvas-subtle);
     color: var(--color-fg-default);
   `,
   floating: `
     position: fixed;
-    top: 20px;
+    bottom: 20px;
     right: 20px;
     z-index: 9999;
     width: 320px;
+    max-width: calc(100vw - 40px);
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
     box-shadow: 0 8px 24px rgba(0,0,0,0.2);
     border: 1px solid var(--color-border-default);
-    border-radius: 6px;
+    border-radius: 12px;
     padding: 16px;
-    // DEBUG: REMOVE THIS BACKGROUND AFTER TESTING
-    background-color: #ffffff !important;
+    background-color: var(--color-canvas-default);
     color: var(--color-fg-default);
+    transition: opacity 0.3s ease, transform 0.3s ease;
   `,
   closeBtn: `
     background: none;
@@ -41,6 +46,17 @@ const CARD_STYLES = {
     color: var(--color-fg-muted);
     padding: 0 4px;
     line-height: 1;
+  `,
+  copyBtn: `
+    background: none;
+    border: 1px solid var(--color-border-default);
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 2px 6px;
+    color: var(--color-fg-muted);
+    line-height: 1;
+    font-size: 14px;
+    transition: color 0.2s ease, border-color 0.2s ease;
   `,
   scoreBox: `
     background-color: var(--color-canvas-default);
@@ -52,6 +68,16 @@ const CARD_STYLES = {
   scoreValue: `
     font-size: 28px;
     font-weight: bold;
+    color: var(--color-fg-default);
+  `,
+  tierBadge: `
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 12px;
+    margin-top: 4px;
+    background-color: var(--color-neutral-muted);
     color: var(--color-fg-default);
   `,
   metricRow: `
@@ -84,15 +110,17 @@ const CARD_STYLES = {
   `,
 };
 
-/**
- * Creates the DOM element for the Integrity Score card.
- * @param {boolean} isFloating - If true, renders as a fixed floating widget.
- * @returns {HTMLElement} The constructed card element.
- */
+// ─── Clipboard SVG icon ──────────────────────────────────────────────────────
+
+const COPY_ICON_SVG = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"/><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"/></svg>`;
+
+const CHECK_ICON_SVG = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"/></svg>`;
+
+// ─── Card builder ────────────────────────────────────────────────────────────
+
 const createIntegrityCard = (isFloating = false) => {
   const card = document.createElement('div');
   card.id = INTEGRITY_CARD_ID;
-
   card.className = isFloating ? '' : 'BorderGrid-row';
   card.setAttribute('role', 'region');
   card.setAttribute('aria-label', 'GitHub Integrity Guard — Trust Score');
@@ -108,6 +136,7 @@ const createIntegrityCard = (isFloating = false) => {
       <h2 class="h4 mb-2 d-flex flex-justify-between flex-items-center">
         <span>🛡️ Integrity Score</span>
         <span style="display:flex;align-items:center;gap:6px;">
+          <button data-ig-copy style="${CARD_STYLES.copyBtn}" aria-label="Copy Trust Score result to clipboard" title="Copy score">${COPY_ICON_SVG}</button>
           <span data-ig-status class="color-fg-muted text-small">Pending</span>
           ${closeBtnHtml}
         </span>
@@ -117,6 +146,7 @@ const createIntegrityCard = (isFloating = false) => {
       <div style="${CARD_STYLES.scoreBox}">
         <span data-ig-score style="${CARD_STYLES.scoreValue}">--/100</span>
         <p data-ig-label class="text-small color-fg-muted mt-1 mb-0">Analyzing repository health…</p>
+        <span data-ig-tier style="${CARD_STYLES.tierBadge}; display:none;"></span>
       </div>
 
       <!-- Metric breakdown -->
@@ -127,6 +157,9 @@ const createIntegrityCard = (isFloating = false) => {
         <div style="${CARD_STYLES.metricRow}"><span>Discussion</span><div style="display:flex;align-items:center;"><span data-ig-discussion-pts></span><div style="${CARD_STYLES.progressTrack}"><div data-ig-discussion-bar style="height:100%;border-radius:3px;"></div></div></div></div>
       </div>
 
+      <!-- Tier notes -->
+      <div data-ig-tier-notes style="margin-top:6px;display:none;font-size:11px;color:var(--color-fg-muted);"></div>
+
       <!-- Red flag banner -->
       <div data-ig-redflag style="${CARD_STYLES.redFlagBanner}" role="alert">
         ⚠️ Red Flag: Abnormally low fork ratio for a popular repository
@@ -134,25 +167,59 @@ const createIntegrityCard = (isFloating = false) => {
 
       <!-- Screen reader summary (visually hidden) -->
       <span data-ig-sr-summary class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;"></span>
+
+      <!-- Live region for copy announcements (visually hidden) -->
+      <span data-ig-live aria-live="assertive" role="status" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;"></span>
     </div>
   `;
 
-  // Wire close button if floating
+  // Wire close button
   if (isFloating) {
     const closeBtn = card.querySelector('[data-ig-close]');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', () => card.remove());
-    }
+    if (closeBtn) closeBtn.addEventListener('click', () => card.remove());
+  }
+
+  // Wire copy button
+  const copyBtn = card.querySelector('[data-ig-copy]');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', () => handleCopy(card, copyBtn));
   }
 
   return card;
 };
 
-/**
- * Maps the scoring color key to a Primer CSS variable.
- * @param {string} colorKey - 'danger' | 'warning' | 'healthy'
- * @returns {string} CSS variable reference.
- */
+// ─── Copy-to-Clipboard handler ───────────────────────────────────────────────
+
+const handleCopy = async (card, btn) => {
+  const srSummary = card.querySelector('[data-ig-sr-summary]');
+  const liveRegion = card.querySelector('[data-ig-live]');
+  const textToCopy = srSummary ? srSummary.textContent : '';
+
+  if (!textToCopy) return;
+
+  try {
+    await navigator.clipboard.writeText(textToCopy);
+    // Visual feedback — swap icon
+    btn.innerHTML = CHECK_ICON_SVG;
+    btn.style.color = 'var(--color-success-fg)';
+    btn.style.borderColor = 'var(--color-success-fg)';
+
+    // Announce to screen readers
+    if (liveRegion) liveRegion.textContent = 'Score copied to clipboard';
+
+    setTimeout(() => {
+      btn.innerHTML = COPY_ICON_SVG;
+      btn.style.color = '';
+      btn.style.borderColor = '';
+      if (liveRegion) liveRegion.textContent = '';
+    }, 2000);
+  } catch {
+    if (liveRegion) liveRegion.textContent = 'Failed to copy score';
+  }
+};
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
 const colorToCssVar = (colorKey) => {
   const map = {
     danger:  'var(--color-danger-fg)',
@@ -162,28 +229,19 @@ const colorToCssVar = (colorKey) => {
   return map[colorKey] ?? 'var(--color-fg-default)';
 };
 
-/**
- * Fills a mini progress bar element.
- * @param {HTMLElement} bar
- * @param {number} points
- * @param {number} max
- * @param {string} cssColor
- */
 const fillBar = (bar, points, max, cssColor) => {
-  const pct = Math.round((points / max) * 100);
+  if (typeof points === 'string' || typeof max === 'string') {
+    bar.style.width = points === '✓' ? '100%' : '0%';
+    bar.style.backgroundColor = points === '✓' ? 'var(--color-success-fg)' : 'var(--color-border-muted)';
+    return;
+  }
+  const pct = max > 0 ? Math.round((points / max) * 100) : 0;
   bar.style.width = `${pct}%`;
   bar.style.backgroundColor = cssColor;
 };
 
-/**
- * Updates the sidebar card with a full score result or a simple error object.
- *
- * Accepts two shapes:
- *   Rich result : { score, color, label, redFlag, breakdown }
- *   Error result: { score: string, status: string }
- *
- * @param {Object} scoreData
- */
+// ─── Card updater ────────────────────────────────────────────────────────────
+
 const updateCardWithScore = (scoreData) => {
   const card = document.getElementById(INTEGRITY_CARD_ID);
   if (!card) return;
@@ -196,6 +254,8 @@ const updateCardWithScore = (scoreData) => {
   const breakdownEl = $('[data-ig-breakdown]');
   const redFlagEl   = $('[data-ig-redflag]');
   const srSummary   = $('[data-ig-sr-summary]');
+  const tierEl      = $('[data-ig-tier]');
+  const tierNotesEl = $('[data-ig-tier-notes]');
 
   // ── Error / simple result (no breakdown) ──
   if (!scoreData.breakdown) {
@@ -206,20 +266,30 @@ const updateCardWithScore = (scoreData) => {
   }
 
   // ── Rich result ──
-  const { score, color, label, redFlag, breakdown } = scoreData;
+  const { score, color, label, redFlag, breakdown, tier, tierNotes = [] } = scoreData;
   const cssColor = colorToCssVar(color);
 
-  // Header
   if (statusEl) statusEl.textContent = label;
 
-  // Score number
   if (scoreEl) {
     scoreEl.textContent = `${score}/100`;
     scoreEl.style.color = cssColor;
   }
 
-  // Label text
   if (labelEl) labelEl.textContent = `${label} — ${breakdown.forks.note}`;
+
+  // Tier badge
+  if (tierEl && tier) {
+    tierEl.textContent = `Tier ${tier.tier}: ${tier.name}`;
+    tierEl.style.display = 'inline-block';
+    tierEl.title = tier.description;
+  }
+
+  // Tier notes
+  if (tierNotesEl && tierNotes.length > 0) {
+    tierNotesEl.style.display = 'block';
+    tierNotesEl.textContent = tierNotes.join(' · ');
+  }
 
   // Breakdown section
   if (breakdownEl) {
@@ -234,32 +304,41 @@ const updateCardWithScore = (scoreData) => {
     const discussionPts = $('[data-ig-discussion-pts]');
     const discussionBar = $('[data-ig-discussion-bar]');
 
-    if (forksPts)      forksPts.textContent      = `${breakdown.forks.points}/${breakdown.forks.max}`;
+    const renderPts = (pts, max) => typeof pts === 'string' ? pts : `${pts}/${max}`;
+
+    if (forksPts)      forksPts.textContent      = renderPts(breakdown.forks.points, breakdown.forks.max);
     if (forksBar)      fillBar(forksBar,      breakdown.forks.points,      breakdown.forks.max,      cssColor);
-    if (commitsPts)    commitsPts.textContent    = `${breakdown.commits.points}/${breakdown.commits.max}`;
+    if (commitsPts)    commitsPts.textContent    = renderPts(breakdown.commits.points, breakdown.commits.max);
     if (commitsBar)    fillBar(commitsBar,    breakdown.commits.points,    breakdown.commits.max,    cssColor);
-    if (issuesPts)     issuesPts.textContent     = `${breakdown.issues.points}/${breakdown.issues.max}`;
+    if (issuesPts)     issuesPts.textContent     = renderPts(breakdown.issues.points, breakdown.issues.max);
     if (issuesBar)     fillBar(issuesBar,     breakdown.issues.points,     breakdown.issues.max,     cssColor);
     if (breakdown.discussion) {
-      if (discussionPts) discussionPts.textContent = `${breakdown.discussion.points}/${breakdown.discussion.max}`;
+      if (discussionPts) discussionPts.textContent = renderPts(breakdown.discussion.points, breakdown.discussion.max);
       if (discussionBar) fillBar(discussionBar, breakdown.discussion.points, breakdown.discussion.max, cssColor);
     }
   }
 
   // Red Flag banner
-  if (redFlagEl && redFlag) {
-    redFlagEl.style.display = 'block';
-  }
+  if (redFlagEl && redFlag) redFlagEl.style.display = 'block';
 
+  // Screen reader summary — tiered narration
   if (srSummary) {
     const parts = [
       `Trust Score: ${score} out of 100, rated ${label}.`,
-      `Fork to Star ratio scored ${breakdown.forks.points} of ${breakdown.forks.max}: ${breakdown.forks.note}.`,
-      `Commit activity scored ${breakdown.commits.points} of ${breakdown.commits.max}: ${breakdown.commits.note}.`,
-      `Issue health scored ${breakdown.issues.points} of ${breakdown.issues.max}: ${breakdown.issues.note}.`,
     ];
+    if (tier) {
+      parts.push(`Scoring Tier: ${tier.name} (${tier.description}).`);
+    }
+    if (tierNotes.length > 0) {
+      parts.push(`Tier notes: ${tierNotes.join('. ')}.`);
+    }
+
+    const fmt = (b) => typeof b.points === 'string' ? b.points : `${b.points} of ${b.max}`;
+    parts.push(`Fork to Star ratio scored ${fmt(breakdown.forks)}: ${breakdown.forks.note}.`);
+    parts.push(`Commit activity scored ${fmt(breakdown.commits)}: ${breakdown.commits.note}.`);
+    parts.push(`Issue health scored ${fmt(breakdown.issues)}: ${breakdown.issues.note}.`);
     if (breakdown.discussion) {
-      parts.push(`Discussion depth scored ${breakdown.discussion.points} of ${breakdown.discussion.max}: ${breakdown.discussion.note}.`);
+      parts.push(`Discussion depth scored ${fmt(breakdown.discussion)}: ${breakdown.discussion.note}.`);
     }
     if (redFlag) {
       parts.push('Red flag: abnormally low fork ratio for a popular repository.');
@@ -268,56 +347,42 @@ const updateCardWithScore = (scoreData) => {
   }
 };
 
-/**
- * Maps GitHubApiError status codes to user-friendly card messages.
- * @param {Error} error
- * @returns {{ score: string, status: string }}
- */
+// ─── Error display ───────────────────────────────────────────────────────────
+
 const buildErrorDisplay = (error) => {
   if (error.name === 'GitHubApiError') {
     switch (error.status) {
-      case 401:
-        return { score: '!', status: 'Invalid token — check Options page' };
+      case 401: return { score: '!', status: 'Invalid token — check Options page' };
       case 403:
       case 429: {
         const retry = error.retryAfter ? ` (resets in ${error.retryAfter}s)` : '';
         return { score: '!', status: `Rate limited${retry}` };
       }
-      case 404:
-        return { score: 'N/A', status: 'Repository not found' };
-      default:
-        return { score: '!', status: `API error (${error.status})` };
+      case 404: return { score: 'N/A', status: 'Repository not found' };
+      default:  return { score: '!', status: `API error (${error.status})` };
     }
   }
   return { score: '!', status: 'Unexpected error' };
 };
 
-/**
- * Injects the Integrity Score card into the GitHub repository sidebar.
- * Falls back to a floating widget if .Layout-sidebar is not found.
- * Follows a cache-first strategy before making API requests.
- */
+// ─── Smart injection with floating fallback ──────────────────────────────────
+
 const injectCardIntoSidebar = async () => {
-  // Exit if already injected
   if (document.getElementById(INTEGRITY_CARD_ID)) return;
 
-  const sidebar = document.querySelector('.Layout-sidebar');
+  const isSmallScreen = window.innerWidth < SMALL_SCREEN_PX;
+  const sidebar = isSmallScreen ? null : document.querySelector('.Layout-sidebar');
   const isFloating = !sidebar;
   const card = createIntegrityCard(isFloating);
 
   if (sidebar) {
-    // Inject at the top of the sidebar
-    if (sidebar.firstChild) {
-      sidebar.insertBefore(card, sidebar.firstChild);
-    } else {
-      sidebar.appendChild(card);
-    }
+    if (sidebar.firstChild) sidebar.insertBefore(card, sidebar.firstChild);
+    else sidebar.appendChild(card);
   } else {
-    // No sidebar — inject as floating element
     document.body.appendChild(card);
   }
 
-  // Extract owner/repo from the URL path
+  // Fetch and score
   const pathParts = window.location.pathname.split('/').filter(Boolean);
   if (pathParts.length < 2) return;
 
@@ -326,7 +391,6 @@ const injectCardIntoSidebar = async () => {
   const cacheKey = `repo_score_${repoFullName}`;
 
   try {
-    // Dynamically import modules (content scripts can't use static imports)
     const storageUrl = chrome.runtime.getURL('storage.js');
     const serviceUrl = chrome.runtime.getURL('github-service.js');
     const [StorageUtil, GitHubService] = await Promise.all([
@@ -334,23 +398,17 @@ const injectCardIntoSidebar = async () => {
       import(serviceUrl),
     ]);
 
-    // ── 1. Cache check ──────────────────────────────────────────────────────
     const cached = await StorageUtil.getWithExpiry(cacheKey);
-
     if (cached) {
       console.log(`[gh-integrity-guard] Cache hit for ${repoFullName}`);
       updateCardWithScore(cached);
       return;
     }
 
-    // ── 2. Fetch from GitHub API ────────────────────────────────────────────
     console.log(`[gh-integrity-guard] Cache miss — fetching data for ${repoFullName}`);
     const repoData = await GitHubService.fetchRepoMetadata(owner, repo);
-
-    // ── 3. Calculate score ──────────────────────────────────────────────────
     const scoreData = GitHubService.calculateTrustScore(repoData);
 
-    // ── 4. Persist to cache with 24-hour TTL ────────────────────────────────
     await StorageUtil.setWithExpiry(cacheKey, scoreData, 1440);
     updateCardWithScore(scoreData);
   } catch (error) {
@@ -359,9 +417,8 @@ const injectCardIntoSidebar = async () => {
   }
 };
 
-/**
- * Initializes the content script by attempting injection and setting up listeners.
- */
+// ─── Initialization ──────────────────────────────────────────────────────────
+
 const init = () => {
   // Attempt immediate injection
   injectCardIntoSidebar();
@@ -370,20 +427,26 @@ const init = () => {
   document.addEventListener('turbo:load', injectCardIntoSidebar);
   document.addEventListener('pjax:end', injectCardIntoSidebar);
 
-  // Fallback: observe dynamic DOM changes to catch delayed sidebar rendering
-  const observer = new MutationObserver((mutations) => {
-    for (const mutation of mutations) {
-      if (mutation.addedNodes.length > 0) {
-        const sidebar = document.querySelector('.Layout-sidebar');
-        if (sidebar && !document.getElementById(INTEGRITY_CARD_ID)) {
-          injectCardIntoSidebar();
-        }
-      }
+  // Smart MutationObserver: watches for .Layout-sidebar and injects once found
+  let observerTimeout = null;
+  const observer = new MutationObserver(() => {
+    if (document.getElementById(INTEGRITY_CARD_ID)) return;
+    const sidebar = document.querySelector('.Layout-sidebar');
+    if (sidebar) {
+      clearTimeout(observerTimeout);
+      injectCardIntoSidebar();
     }
   });
 
   observer.observe(document.body, { childList: true, subtree: true });
+
+  // Floating fallback: if sidebar not found after SIDEBAR_WAIT_MS, force inject
+  observerTimeout = setTimeout(() => {
+    if (!document.getElementById(INTEGRITY_CARD_ID)) {
+      console.log('[gh-integrity-guard] Sidebar not found after timeout — injecting floating card');
+      injectCardIntoSidebar();
+    }
+  }, SIDEBAR_WAIT_MS);
 };
 
-// Start the initialization process
 init();
