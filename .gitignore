@@ -19,3 +19,5 @@ secret.json
 # prd and text files 
 prd.md
 *.txt
+st/
+token.txt
