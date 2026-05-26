@@ -13,29 +13,30 @@ const SMALL_SCREEN_PX = 768;
 
 const CARD_STYLES = {
   wrapper: `
-    border: 1px solid var(--color-border-default);
+    border: 1px solid var(--color-border-default, #d0d7de);
     border-radius: 6px;
     padding: 16px;
     margin-top: 16px;
     margin-bottom: 16px;
-    background-color: var(--color-canvas-subtle);
-    color: var(--color-fg-default);
+    background-color: var(--color-canvas-subtle, #f6f8fa);
+    color: var(--color-fg-default, #24292f);
   `,
   floating: `
     position: fixed;
     bottom: 20px;
     right: 20px;
-    z-index: 9999;
+    z-index: 2147483647;
     width: 320px;
     max-width: calc(100vw - 40px);
     max-height: calc(100vh - 40px);
     overflow-y: auto;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-    border: 1px solid var(--color-border-default);
+    box-shadow: 0 12px 28px rgba(0,0,0,0.5);
+    border: 1px solid var(--color-border-default, #30363d);
     border-radius: 12px;
     padding: 16px;
-    background-color: var(--color-canvas-default);
-    color: var(--color-fg-default);
+    background-color: var(--color-canvas-default, #0d1117);
+    color: var(--color-fg-default, #c9d1d9);
+    backdrop-filter: blur(8px);
     transition: opacity 0.3s ease, transform 0.3s ease;
   `,
   closeBtn: `
@@ -43,24 +44,24 @@ const CARD_STYLES = {
     border: none;
     cursor: pointer;
     font-size: 16px;
-    color: var(--color-fg-muted);
+    color: var(--color-fg-muted, #8b949e);
     padding: 0 4px;
     line-height: 1;
   `,
   copyBtn: `
     background: none;
-    border: 1px solid var(--color-border-default);
+    border: 1px solid var(--color-border-default, #30363d);
     border-radius: 4px;
     cursor: pointer;
     padding: 2px 6px;
-    color: var(--color-fg-muted);
+    color: var(--color-fg-muted, #8b949e);
     line-height: 1;
     font-size: 14px;
     transition: color 0.2s ease, border-color 0.2s ease;
   `,
   scoreBox: `
-    background-color: var(--color-canvas-default);
-    border: 1px solid var(--color-border-muted);
+    background-color: var(--color-canvas-default, #0d1117);
+    border: 1px solid var(--color-border-muted, #21262d);
     border-radius: 6px;
     padding: 12px;
     text-align: center;
@@ -68,7 +69,7 @@ const CARD_STYLES = {
   scoreValue: `
     font-size: 28px;
     font-weight: bold;
-    color: var(--color-fg-default);
+    color: var(--color-fg-default, #c9d1d9);
   `,
   tierBadge: `
     display: inline-block;
@@ -77,8 +78,8 @@ const CARD_STYLES = {
     padding: 2px 8px;
     border-radius: 12px;
     margin-top: 4px;
-    background-color: var(--color-neutral-muted);
-    color: var(--color-fg-default);
+    background-color: var(--color-neutral-muted, rgba(110,118,129,0.4));
+    color: var(--color-fg-default, #c9d1d9);
   `,
   metricRow: `
     display: flex;
@@ -86,12 +87,12 @@ const CARD_STYLES = {
     align-items: center;
     padding: 4px 0;
     font-size: 12px;
-    color: var(--color-fg-muted);
+    color: var(--color-fg-muted, #8b949e);
   `,
   progressTrack: `
     width: 60px;
     height: 6px;
-    background-color: var(--color-border-muted);
+    background-color: var(--color-border-muted, #21262d);
     border-radius: 3px;
     overflow: hidden;
     margin-left: 8px;
@@ -99,8 +100,8 @@ const CARD_STYLES = {
   redFlagBanner: `
     display: none;
     background-color: var(--color-danger-subtle, rgba(255,129,130,0.1));
-    color: var(--color-danger-fg);
-    border: 1px solid var(--color-danger-emphasis, #cf222e);
+    color: var(--color-danger-fg, #ff7b72);
+    border: 1px solid var(--color-danger-emphasis, #f85149);
     border-radius: 6px;
     padding: 8px;
     margin-top: 8px;
@@ -123,7 +124,8 @@ const createIntegrityCard = (isFloating = false) => {
   card.id = INTEGRITY_CARD_ID;
   card.className = isFloating ? '' : 'BorderGrid-row';
   card.setAttribute('role', 'region');
-  card.setAttribute('aria-label', 'GitHub Integrity Guard — Trust Score');
+  card.setAttribute('aria-label', 'GitHub Integrity Guard Scorecard');
+  card.setAttribute('tabindex', '0'); // Added for direct NVDA focus via Tab
   card.setAttribute('aria-live', 'polite');
   card.style.cssText = isFloating ? CARD_STYLES.floating : CARD_STYLES.wrapper;
 
@@ -142,14 +144,12 @@ const createIntegrityCard = (isFloating = false) => {
         </span>
       </h2>
 
-      <!-- Score display -->
       <div style="${CARD_STYLES.scoreBox}">
         <span data-ig-score style="${CARD_STYLES.scoreValue}">--/100</span>
         <p data-ig-label class="text-small color-fg-muted mt-1 mb-0">Analyzing repository health…</p>
         <span data-ig-tier style="${CARD_STYLES.tierBadge}; display:none;"></span>
       </div>
 
-      <!-- Metric breakdown -->
       <div data-ig-breakdown style="margin-top: 10px; display: none;">
         <div style="${CARD_STYLES.metricRow}"><span>Forks / Stars</span><div style="display:flex;align-items:center;"><span data-ig-forks-pts></span><div style="${CARD_STYLES.progressTrack}"><div data-ig-forks-bar style="height:100%;border-radius:3px;"></div></div></div></div>
         <div style="${CARD_STYLES.metricRow}"><span>Commit Activity</span><div style="display:flex;align-items:center;"><span data-ig-commits-pts></span><div style="${CARD_STYLES.progressTrack}"><div data-ig-commits-bar style="height:100%;border-radius:3px;"></div></div></div></div>
@@ -157,18 +157,14 @@ const createIntegrityCard = (isFloating = false) => {
         <div style="${CARD_STYLES.metricRow}"><span>Discussion</span><div style="display:flex;align-items:center;"><span data-ig-discussion-pts></span><div style="${CARD_STYLES.progressTrack}"><div data-ig-discussion-bar style="height:100%;border-radius:3px;"></div></div></div></div>
       </div>
 
-      <!-- Tier notes -->
       <div data-ig-tier-notes style="margin-top:6px;display:none;font-size:11px;color:var(--color-fg-muted);"></div>
 
-      <!-- Red flag banner -->
       <div data-ig-redflag style="${CARD_STYLES.redFlagBanner}" role="alert">
         ⚠️ Red Flag: Abnormally low fork ratio for a popular repository
       </div>
 
-      <!-- Screen reader summary (visually hidden) -->
       <span data-ig-sr-summary class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;"></span>
 
-      <!-- Live region for copy announcements (visually hidden) -->
       <span data-ig-live aria-live="assertive" role="status" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;"></span>
     </div>
   `;
