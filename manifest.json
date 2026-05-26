@@ -3,15 +3,8 @@
   "name": "GitHub Integrity Guard",
   "version": "1.0.0",
   "description": "Provides instant transparency regarding the authenticity and health of GitHub repositories.",
-  "permissions": [
-    "storage",
-    "declarativeContent",
-    "tabs"
-  ],
-  "host_permissions": [
-    "https://github.com/*",
-    "https://api.github.com/*"
-  ],
+  "permissions": ["storage", "declarativeContent", "tabs"],
+  "host_permissions": ["https://github.com/*", "https://api.github.com/*"],
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -29,28 +22,28 @@
   },
   "content_scripts": [
     {
-      "matches": [
-        "https://github.com/*"
-      ],
-      "js": [
-        "content.js"
-      ],
+      "matches": ["https://github.com/*"],
+      "js": ["content.js"],
       "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": [
-        "storage.js",
-        "github-service.js"
-      ],
-      "matches": [
-        "https://github.com/*"
-      ]
+      "resources": ["storage.js", "github-service.js"],
+      "matches": ["https://github.com/*"]
     }
   ],
   "options_ui": {
     "page": "options.html",
     "open_in_tab": true
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "gh-integrity-guard@ahmedthebest31.com",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
   }
 }
