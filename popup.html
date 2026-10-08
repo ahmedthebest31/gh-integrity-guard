@@ -22,23 +22,34 @@
       margin-bottom: 12px;
     }
     .score-value { font-size: 28px; font-weight: bold; }
+    .c-danger { color: #cf222e; }
+    .c-warning { color: #9a6700; }
+    .c-healthy { color: #1a7f37; }
     .score-label { font-size: 12px; color: #57606a; margin-top: 4px; }
     .metric { display: flex; justify-content: space-between; font-size: 12px; color: #57606a; padding: 3px 0; }
     .empty { text-align: center; color: #57606a; font-size: 13px; padding: 20px 0; }
     .red-flag { background: #ffebe9; color: #cf222e; border: 1px solid #d1242f; border-radius: 6px; padding: 8px; font-size: 12px; font-weight: 600; text-align: center; margin-top: 8px; }
+    .footer { margin-top: 12px; text-align: center; }
+    .footer a { font-size: 12px; color: #0969da; text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
     @media (prefers-color-scheme: dark) {
       body { background: #0d1117; color: #c9d1d9; }
       .score-box { border-color: #30363d; }
       .score-label, .metric, .empty { color: #8b949e; }
+      .c-danger { color: #ff7b72; }
+      .c-warning { color: #d29922; }
+      .c-healthy { color: #3fb950; }
       .red-flag { background: rgba(255,123,114,0.1); color: #ff7b72; border-color: #f85149; }
+      .footer a { color: #4493f8; }
     }
   </style>
 </head>
 <body>
-  <h1>🛡️ Integrity Guard</h1>
+  <h1><span aria-hidden="true">🛡️</span> Integrity Guard</h1>
   <div id="popup-content">
     <p class="empty">Navigate to a GitHub repository to see its Trust Score.</p>
   </div>
+  <div class="footer"><a href="#" id="options-link">Token settings (optional boost)</a></div>
   <script src="popup.js" type="module"></script>
 </body>
 </html>

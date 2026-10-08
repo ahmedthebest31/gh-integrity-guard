@@ -1,10 +1,12 @@
 import { getWithExpiry } from './storage.js';
 
-const COLOR_MAP = {
-  danger:  '#cf222e',
-  warning: '#bf8700',
-  healthy: '#1a7f37',
+const COLOR_CLASS_MAP = {
+  danger:  'c-danger',
+  warning: 'c-warning',
+  healthy: 'c-healthy',
 };
+
+const fmtPts = (pts, max) => (typeof pts === 'string' ? pts : `${pts}/${max}`);
 
 /**
  * Renders the cached score into the popup.
@@ -13,24 +15,24 @@ const COLOR_MAP = {
 const renderScore = (scoreData) => {
   const container = document.getElementById('popup-content');
   const { score, color, label, redFlag, breakdown } = scoreData;
-  const hex = COLOR_MAP[color] ?? '#24292f';
+  const colorClass = COLOR_CLASS_MAP[color] ?? '';
 
   let html = `
     <div class="score-box">
-      <div class="score-value" style="color:${hex}">${score}/100</div>
+      <div class="score-value ${colorClass}">${score}/100</div>
       <div class="score-label">${label}</div>
     </div>
-    <div class="metric"><span>Forks / Stars</span><span>${breakdown.forks.points}/${breakdown.forks.max}</span></div>
-    <div class="metric"><span>Commits (90d)</span><span>${breakdown.commits.points}/${breakdown.commits.max}</span></div>
-    <div class="metric"><span>Issue Health</span><span>${breakdown.issues.points}/${breakdown.issues.max}</span></div>
+    <div class="metric"><span>Forks / Stars</span><span>${fmtPts(breakdown.forks.points, breakdown.forks.max)}</span></div>
+    <div class="metric"><span>Commits (90d)</span><span>${fmtPts(breakdown.commits.points, breakdown.commits.max)}</span></div>
+    <div class="metric"><span>Issue Health</span><span>${fmtPts(breakdown.issues.points, breakdown.issues.max)}</span></div>
   `;
 
   if (breakdown.discussion) {
-    html += `<div class="metric"><span>Discussion</span><span>${breakdown.discussion.points}/${breakdown.discussion.max}</span></div>`;
+    html += `<div class="metric"><span>Discussion</span><span>${fmtPts(breakdown.discussion.points, breakdown.discussion.max)}</span></div>`;
   }
 
   if (redFlag) {
-    html += `<div class="red-flag">⚠️ Red Flag Detected</div>`;
+    html += `<div class="red-flag"><span aria-hidden="true">⚠️</span> Red Flag Detected</div>`;
   }
 
   container.innerHTML = html;
@@ -66,3 +68,11 @@ const init = async () => {
 };
 
 document.addEventListener('DOMContentLoaded', init);
+
+const optionsLink = document.getElementById('options-link');
+if (optionsLink) {
+  optionsLink.addEventListener('click', (event) => {
+    event.preventDefault();
+    chrome.runtime.openOptionsPage();
+  });
+}

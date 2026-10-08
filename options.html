@@ -141,6 +141,24 @@
             display: flex;
             gap: 8px;
         }
+
+        .visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        input:focus-visible,
+        button:focus-visible {
+            outline: 3px solid var(--color-btn-bg);
+            outline-offset: 2px;
+        }
     </style>
 </head>
 <body>
@@ -156,7 +174,7 @@
                 placeholder="Paste your token here (optional)" 
                 aria-describedby="pat-description"
             >
-            <div id="pat-description" class="visually-hidden" style="display: none;">
+            <div id="pat-description" class="visually-hidden">
                 Optional: enter a GitHub Personal Access Token to raise the extension's rate limit from the free 60 requests per hour to 5,000.
             </div>
 

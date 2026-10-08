@@ -379,6 +379,9 @@ const buildErrorDisplay = (error) => {
 // ─── Smart injection with floating fallback ──────────────────────────────────
 
 const injectCardIntoSidebar = async () => {
+  const pathParts = window.location.pathname.split('/').filter(Boolean);
+  if (pathParts.length < 2) return;
+
   if (document.getElementById(INTEGRITY_CARD_ID)) return;
 
   const isSmallScreen = window.innerWidth < SMALL_SCREEN_PX;
@@ -394,9 +397,6 @@ const injectCardIntoSidebar = async () => {
   }
 
   // Fetch and score
-  const pathParts = window.location.pathname.split('/').filter(Boolean);
-  if (pathParts.length < 2) return;
-
   const [owner, repo] = pathParts;
   const repoFullName = `${owner}/${repo}`;
   const cacheKey = `repo_score_${repoFullName}`;
@@ -411,12 +411,12 @@ const injectCardIntoSidebar = async () => {
 
     const cached = await StorageUtil.getWithExpiry(cacheKey);
     if (cached) {
-      console.log(`[gh-integrity-guard] Cache hit for ${repoFullName}`);
+      console.debug(`[gh-integrity-guard] Cache hit for ${repoFullName}`);
       updateCardWithScore(cached);
       return;
     }
 
-    console.log(`[gh-integrity-guard] Cache miss — fetching data for ${repoFullName}`);
+    console.debug(`[gh-integrity-guard] Cache miss — fetching data for ${repoFullName}`);
     const repoData = await GitHubService.fetchRepoMetadata(owner, repo);
     const scoreData = GitHubService.calculateTrustScore(repoData);
 
@@ -454,7 +454,7 @@ const init = () => {
   // Floating fallback: if sidebar not found after SIDEBAR_WAIT_MS, force inject
   observerTimeout = setTimeout(() => {
     if (!document.getElementById(INTEGRITY_CARD_ID)) {
-      console.log('[gh-integrity-guard] Sidebar not found after timeout — injecting floating card');
+      console.debug('[gh-integrity-guard] Sidebar not found after timeout — injecting floating card');
       injectCardIntoSidebar();
     }
   }, SIDEBAR_WAIT_MS);
