@@ -145,20 +145,19 @@
 </head>
 <body>
     <main class="container" role="main">
-        <h1>GitHub API Configuration</h1>
-        <p>Enter your Personal Access Token (PAT) to bypass API rate limits. Your token is encrypted and stored locally.</p>
+        <h1>GitHub API (Optional)</h1>
+        <p>The extension works out of the box using GitHub's free API limit. Adding a token is optional and only raises the limit. Your token is encrypted and stored locally.</p>
         
         <form id="options-form">
-            <label for="pat-input">Personal Access Token</label>
+            <label for="pat-input">Personal Access Token (Optional)</label>
             <input 
                 type="password" 
                 id="pat-input" 
-                placeholder="ghp_xxxxxxxxxxxx" 
+                placeholder="Paste your token here (optional)" 
                 aria-describedby="pat-description"
-                aria-required="true"
             >
             <div id="pat-description" class="visually-hidden" style="display: none;">
-                Enter a valid GitHub Personal Access Token to increase the extension's rate limit.
+                Optional: enter a GitHub Personal Access Token to raise the extension's rate limit from the free 60 requests per hour to 5,000.
             </div>
 
             <div class="actions">

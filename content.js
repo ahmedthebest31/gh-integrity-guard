@@ -352,7 +352,10 @@ const buildErrorDisplay = (error) => {
       case 403:
       case 429: {
         const retry = error.retryAfter ? ` (resets in ${error.retryAfter}s)` : '';
-        return { score: '!', status: `Rate limited${retry}` };
+        const status = error.authenticated
+          ? `Rate limited${retry}`
+          : `Free GitHub limit reached${retry} — optional token in Options raises it`;
+        return { score: '!', status };
       }
       case 404: return { score: 'N/A', status: 'Repository not found' };
       default:  return { score: '!', status: `API error (${error.status})` };

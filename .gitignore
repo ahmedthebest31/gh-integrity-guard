@@ -17,6 +17,7 @@ build/
 secret.json
 
 # prd and text files 
+PROGRESS_TRACKER.md
 prd.md
 *.txt
 st/

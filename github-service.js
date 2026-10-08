@@ -16,11 +16,12 @@ const GITHUB_API = 'https://api.github.com';
 const PAT_CACHE_KEY = 'gh_integrity_pat';
 
 class GitHubApiError extends Error {
-  constructor(message, status, retryAfter = null) {
+  constructor(message, status, { retryAfter = null, authenticated = false } = {}) {
     super(message);
     this.name = 'GitHubApiError';
     this.status = status;
     this.retryAfter = retryAfter;
+    this.authenticated = authenticated;
   }
 }
 
@@ -53,17 +54,63 @@ const parseRetryAfter = (headers) => {
 const request = async (endpoint, token) => {
   const url = `${GITHUB_API}${endpoint}`;
   const response = await fetch(url, { headers: buildHeaders(token) });
+  const authenticated = Boolean(token);
 
   if (response.ok) return await response.json();
 
   if (response.status === 403 || response.status === 429) {
     const retryAfter = parseRetryAfter(response.headers);
     const retryMsg = retryAfter !== null ? ` Resets in ${retryAfter}s.` : '';
-    throw new GitHubApiError(`Rate limit exceeded.${retryMsg}`, response.status, retryAfter);
+    throw new GitHubApiError(`Rate limit exceeded.${retryMsg}`, response.status, { retryAfter, authenticated });
   }
-  if (response.status === 401) throw new GitHubApiError('Unauthorized — your Personal Access Token may be invalid or expired.', 401);
-  if (response.status === 404) throw new GitHubApiError('Repository not found — it may be private or deleted.', 404);
-  throw new GitHubApiError(`Unexpected API response (${response.status}).`, response.status);
+  if (response.status === 401) throw new GitHubApiError('Unauthorized — your Personal Access Token may be invalid or expired.', 401, { authenticated });
+  if (response.status === 404) throw new GitHubApiError('Repository not found — it may be private or deleted.', 404, { authenticated });
+  throw new GitHubApiError(`Unexpected API response (${response.status}).`, response.status, { authenticated });
+};
+
+// ─── Closed-issue count ───────────────────────────────────────────────────────
+
+/**
+ * Counts closed issues via the Search API (excludes pull requests).
+ * @returns {Promise<number>}
+ */
+const countClosedIssuesViaSearch = async (owner, repo, token) => {
+  const result = await request(`/search/issues?q=repo:${owner}/${repo}+type:issue+state:closed&per_page=1`, token);
+  return result.total_count ?? 0;
+};
+
+/**
+ * Fallback count for closed issues via issue-list pagination.
+ * Uses the `Link` header `rel="last"` page number with per_page=1.
+ * Note: this path also counts pull requests; it is a degraded fallback only.
+ * @returns {Promise<number>}
+ */
+const countClosedIssuesViaIssueList = async (owner, repo, token) => {
+  const url = `${GITHUB_API}/repos/${owner}/${repo}/issues?state=closed&per_page=1`;
+  const response = await fetch(url, { headers: buildHeaders(token) });
+  if (!response.ok) {
+    throw new GitHubApiError(`Issue list request failed (${response.status}).`, response.status, { authenticated: Boolean(token) });
+  }
+  const body = await response.json();
+  if (!Array.isArray(body) || body.length === 0) return 0;
+  const link = response.headers.get('link') || '';
+  const lastMatch = link.match(/[?&]page=(\d+)>;\s*rel="last"/);
+  return lastMatch ? parseInt(lastMatch[1], 10) : body.length;
+};
+
+/**
+ * Counts closed issues, preferring the Search API and falling back to
+ * issue-list pagination. The Search API has its own rate-limit bucket, so a
+ * search quota hit must not kill the whole audit.
+ * @returns {Promise<number>}
+ */
+const countClosedIssues = async (owner, repo, token) => {
+  try {
+    return await countClosedIssuesViaSearch(owner, repo, token);
+  } catch (searchError) {
+    console.warn('[gh-integrity-guard] Search API unavailable, falling back to issue-list pagination.', searchError);
+    return await countClosedIssuesViaIssueList(owner, repo, token);
+  }
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -74,10 +121,10 @@ export const fetchRepoMetadata = async (owner, repo) => {
   ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
   const sinceISO = ninetyDaysAgo.toISOString();
 
-  const [repoInfo, recentCommits, closedIssuesResult, recentIssues] = await Promise.all([
+  const [repoInfo, recentCommits, closedIssues, recentIssues] = await Promise.all([
     request(`/repos/${owner}/${repo}`, token),
     request(`/repos/${owner}/${repo}/commits?since=${sinceISO}&per_page=100`, token),
-    request(`/search/issues?q=repo:${owner}/${repo}+type:issue+state:closed&per_page=1`, token),
+    countClosedIssues(owner, repo, token),
     request(`/repos/${owner}/${repo}/issues?state=all&sort=updated&per_page=30`, token),
   ]);
 
@@ -96,7 +143,7 @@ export const fetchRepoMetadata = async (owner, repo) => {
     forks: repoInfo.forks_count ?? 0,
     watchers: repoInfo.subscribers_count ?? repoInfo.watchers_count ?? 0,
     openIssues: repoInfo.open_issues_count ?? 0,
-    closedIssues: closedIssuesResult.total_count ?? 0,
+    closedIssues,
     recentCommitsCount: Array.isArray(recentCommits) ? recentCommits.length : 0,
     avgCommentsPerIssue,
     size: repoInfo.size ?? 0,

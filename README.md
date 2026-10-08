@@ -13,11 +13,11 @@ GitHub Integrity Guard is an advanced, privacy-first browser extension architect
 The extension acts as a silent auditor working directly within your browser, ensuring maximum transparency without cluttering your workflow:
 
 * 🧠 **100% AI-Free & Deterministic:** No black-box AI algorithms, no LLM hallucinations, and no API bloat. Just pure, transparent mathematical logic.
-* 🔑 **Token-Powered API:** To bypass strict rate limits, the extension securely utilizes your GitHub Personal Access Token (PAT). It is encrypted locally via AES-GCM and never leaves your machine.
+* 🔑 **Optional Token Boost:** Works out of the box on GitHub's free API limit. Add a Personal Access Token (PAT) to raise the limit to 5,000 requests per hour; it is encrypted locally via AES-GCM and never leaves your machine.
 * 💉 **Smart UI Injection:** The extension seamlessly injects a clean Scorecard into the native GitHub sidebar. If the sidebar is missing, a resilient **Floating Card** automatically appears.
 * 🚦 **Visual Transparency:** The card displays a definitive Trust Score (out of 100) using a traffic-light color system: **Red (Danger)**, **Yellow (Warning)**, and **Green (Healthy)**.
 * 📊 **Full Breakdown:** It exposes the raw numbers underneath the score (Fork-to-Star ratio, 90-day Commits, Issue Health, and Discussion Depth).
-* 💾 **24-Hour Smart Cache:** To preserve your token's API limits, successful audits are cached locally for 24 hours. Visiting the same repository twice won't trigger redundant network requests.
+* 💾 **24-Hour Smart Cache:** Successful audits are cached locally for 24 hours, which keeps the free 60 requests/hour limit healthy. Visiting the same repository twice won't trigger redundant network requests.
 
 ---
 
@@ -44,26 +44,26 @@ To prevent penalizing new or niche projects, the algorithm dynamically adjusts i
 
 ## 📥 Installation
 
-### ⚡ Direct Download (Decoupled Release)
-* Step 1: Navigate to the [Latest Release](https://github.com/ahmedthebest31/gh-integrity-guard/releases/latest) section of this repository.
-* Step 2: Download the standalone production bundle (`.crx` for Chromium or `.xpi` for Firefox).
-* Step 3: *Security Check:* Compare the provided SHA-256 hash or scan via VirusTotal.
-* Step 4: Simply drag and drop the downloaded file directly into your browser's extensions page (`chrome://extensions` or `about:addons`).
+### 🌐 Official Stores (Recommended)
+You can install GitHub Integrity Guard directly from your browser's official web store:
+* **Google Chrome / Microsoft Edge:** [Install from Chrome Web Store](https://chromewebstore.google.com/detail/github-integrity-guard/ffmjlnmfgggbfpiidebpfdehfipehcla)
+* **Mozilla Firefox:** [Install from Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/github-integrity-guard/)
 
-### 🛠️ Build From Source
-* Step 1: Clone this repository locally.
-* Step 2: Open your browser's extension management environment.
+### 🛠️ Build From Source (For Developers)
+If you prefer to inspect the code or build it manually:
+* Step 1: Clone this repository locally (`git clone https://github.com/ahmedthebest31/gh-integrity-guard.git`).
+* Step 2: Open your browser's extension management page (`chrome://extensions` or `about:debugging` in Firefox).
 * Step 3: Enable **Developer Mode**.
-* Step 4: Click **Load Unpacked** (or **Load Temporary Add-on** in Firefox) and select the extracted project folder.
+* Step 4: Click **Load Unpacked** (or **Load Temporary Add-on**) and select the cloned project folder.
 
 ---
 
-## 🔑 Initial Setup & Privacy (Zero Telemetry)
+## 🔑 Setup & Privacy (Zero Telemetry)
 
-To bypass GitHub's strict API rate limits and provide real-time audits, the extension requires a GitHub Personal Access Token (PAT). 
+No setup required. The extension audits repositories immediately using GitHub's free public API limit (60 requests per hour, kept low via 24-hour local caching). A token is optional and only raises the limit to 5,000 requests per hour.
 
-* **Step 1 (Generate):** Retrieve your existing token via terminal by running `gh auth token`, or generate a new minimal-scope token from your GitHub Developer Settings.
-* **Step 2 (Configure):** Open the extension's **Options** page (right-click the extension icon and select Options), paste your token, and save.
+* **Step 1 (Optional — Generate):** You can skip this for zero-config use, or retrieve your existing token via terminal by running `gh auth token`, or generate a new minimal-scope token from your GitHub Developer Settings.
+* **Step 2 (Optional — Configure):** Open the extension's **Options** page (right-click the extension icon and select Options), paste your token, and save.
 * **🔒 Military-Grade Local Encryption:** Your token is immediately encrypted locally using industry-standard AES-GCM via the native Web Crypto API. 
 * **🚫 Zero Telemetry:** Your data never leaves your device. We do not track you, we do not collect analytics, and there are zero external servers involved. Everything is stored locally in your browser.
 * **🗑️ Full Control:** You can permanently delete or update your encrypted token at any time directly from the Options page.
