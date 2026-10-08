@@ -73,7 +73,7 @@ const CARD_STYLES = {
   `,
   tierBadge: `
     display: inline-block;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
     padding: 2px 8px;
     border-radius: 12px;
@@ -125,7 +125,6 @@ const createIntegrityCard = (isFloating = false) => {
   card.className = isFloating ? '' : 'BorderGrid-row';
   card.setAttribute('role', 'region');
   card.setAttribute('aria-label', 'GitHub Integrity Guard Scorecard');
-  card.setAttribute('tabindex', '0'); // Added for direct NVDA focus via Tab
   card.setAttribute('aria-live', 'polite');
   card.style.cssText = isFloating ? CARD_STYLES.floating : CARD_STYLES.wrapper;
 
@@ -136,7 +135,7 @@ const createIntegrityCard = (isFloating = false) => {
   card.innerHTML = `
     <div class="BorderGrid-cell">
       <h2 class="h4 mb-2 d-flex flex-justify-between flex-items-center">
-        <span>🛡️ Integrity Score</span>
+        <span><span aria-hidden="true">🛡️</span> Integrity Score</span>
         <span style="display:flex;align-items:center;gap:6px;">
           <button data-ig-copy style="${CARD_STYLES.copyBtn}" aria-label="Copy Trust Score result to clipboard" title="Copy score">${COPY_ICON_SVG}</button>
           <span data-ig-status class="color-fg-muted text-small">Pending</span>
@@ -157,10 +156,10 @@ const createIntegrityCard = (isFloating = false) => {
         <div style="${CARD_STYLES.metricRow}"><span>Discussion</span><div style="display:flex;align-items:center;"><span data-ig-discussion-pts></span><div style="${CARD_STYLES.progressTrack}"><div data-ig-discussion-bar style="height:100%;border-radius:3px;"></div></div></div></div>
       </div>
 
-      <div data-ig-tier-notes style="margin-top:6px;display:none;font-size:11px;color:var(--color-fg-muted);"></div>
+      <div data-ig-tier-notes style="margin-top:6px;display:none;font-size:12px;color:var(--color-fg-muted);"></div>
 
       <div data-ig-redflag style="${CARD_STYLES.redFlagBanner}" role="alert">
-        ⚠️ Red Flag: Abnormally low fork ratio for a popular repository
+        <span aria-hidden="true">⚠️</span> Red Flag: Abnormally low fork ratio for a popular repository
       </div>
 
       <span data-ig-sr-summary class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;"></span>
@@ -236,6 +235,14 @@ const fillBar = (bar, points, max, cssColor) => {
   bar.style.backgroundColor = cssColor;
 };
 
+const barStatusColor = (points, max) => {
+  if (typeof points === 'string' || typeof max === 'string') return 'var(--color-border-muted)';
+  const ratio = max > 0 ? points / max : 0;
+  if (ratio >= 0.7) return 'var(--color-success-fg)';
+  if (ratio >= 0.4) return 'var(--color-attention-fg)';
+  return 'var(--color-danger-fg)';
+};
+
 // ─── Card updater ────────────────────────────────────────────────────────────
 
 const updateCardWithScore = (scoreData) => {
@@ -255,7 +262,7 @@ const updateCardWithScore = (scoreData) => {
 
   // ── Error / simple result (no breakdown) ──
   if (!scoreData.breakdown) {
-    if (scoreEl)  scoreEl.textContent = `${scoreData.score}/100`;
+    if (scoreEl)  scoreEl.textContent = typeof scoreData.score === 'number' ? `${scoreData.score}/100` : scoreData.score;
     if (labelEl)  labelEl.textContent = scoreData.status || '';
     if (statusEl) statusEl.textContent = 'Error';
     return;
@@ -302,15 +309,20 @@ const updateCardWithScore = (scoreData) => {
 
     const renderPts = (pts, max) => typeof pts === 'string' ? pts : `${pts}/${max}`;
 
+    const forksColor      = barStatusColor(breakdown.forks.points,      breakdown.forks.max);
+    const commitsColor    = barStatusColor(breakdown.commits.points,    breakdown.commits.max);
+    const issuesColor     = barStatusColor(breakdown.issues.points,     breakdown.issues.max);
+    const discussionColor = breakdown.discussion ? barStatusColor(breakdown.discussion.points, breakdown.discussion.max) : '';
+
     if (forksPts)      forksPts.textContent      = renderPts(breakdown.forks.points, breakdown.forks.max);
-    if (forksBar)      fillBar(forksBar,      breakdown.forks.points,      breakdown.forks.max,      cssColor);
+    if (forksBar)      fillBar(forksBar,      breakdown.forks.points,      breakdown.forks.max,      forksColor);
     if (commitsPts)    commitsPts.textContent    = renderPts(breakdown.commits.points, breakdown.commits.max);
-    if (commitsBar)    fillBar(commitsBar,    breakdown.commits.points,    breakdown.commits.max,    cssColor);
+    if (commitsBar)    fillBar(commitsBar,    breakdown.commits.points,    breakdown.commits.max,    commitsColor);
     if (issuesPts)     issuesPts.textContent     = renderPts(breakdown.issues.points, breakdown.issues.max);
-    if (issuesBar)     fillBar(issuesBar,     breakdown.issues.points,     breakdown.issues.max,     cssColor);
+    if (issuesBar)     fillBar(issuesBar,     breakdown.issues.points,     breakdown.issues.max,     issuesColor);
     if (breakdown.discussion) {
       if (discussionPts) discussionPts.textContent = renderPts(breakdown.discussion.points, breakdown.discussion.max);
-      if (discussionBar) fillBar(discussionBar, breakdown.discussion.points, breakdown.discussion.max, cssColor);
+      if (discussionBar) fillBar(discussionBar, breakdown.discussion.points, breakdown.discussion.max, discussionColor);
     }
   }
 

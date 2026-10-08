@@ -167,10 +167,10 @@ const scoreTier1 = (data) => {
   const notes = [];
 
   const isEmpty = size === 0 && recentCommitsCount === 0;
-  if (isEmpty) { score = 40; notes.push('Repository appears empty (no files or commits)'); }
+  if (isEmpty) { score = 30; notes.push('Repository appears empty (no files or commits)'); }
 
   const isDormant = daysSinceLastPush > 365;
-  if (isDormant && !isEmpty) { score = Math.max(70, score - 20); notes.push('No activity for over a year'); }
+  if (isDormant && !isEmpty) { score = Math.max(70, score - 25); notes.push('No activity for over a year'); }
 
   if (recentCommitsCount > 0 && !isEmpty) {
     score = Math.min(100, score + Math.min(8, Math.round(recentCommitsCount / 3)));
@@ -210,7 +210,7 @@ const scoreTier2 = (data) => {
   // Forks (relaxed)
   let fk = { pts: 0, note: '', r: 0 };
   if (stars === 0) fk = { pts: 0, note: 'No stars', r: 0 };
-  else { fk.r = forks / stars; if (fk.r >= 0.10) fk = { ...fk, pts: W.forks, note: 'Healthy fork engagement' }; else if (fk.r < 0.02) fk = { ...fk, pts: Math.round((fk.r / 0.02) * W.forks * 0.5), note: 'Low fork ratio — monitor' }; else { const n = (fk.r - 0.02) / 0.08; fk = { ...fk, pts: Math.round(n * W.forks), note: 'Moderate fork engagement' }; } }
+  else { fk.r = forks / stars; if (fk.r >= 0.10) fk = { ...fk, pts: W.forks, note: 'Healthy fork engagement' }; else if (fk.r < 0.02) fk = { ...fk, pts: Math.round((fk.r / 0.02) * W.forks * 0.5), note: 'Low fork ratio — monitor' }; else { const n = (fk.r - 0.02) / 0.08; fk = { ...fk, pts: Math.round(W.forks * 0.5 * (1 + n)), note: 'Moderate fork engagement' }; } }
 
   // Discussion
   let disc = { pts: 0, note: '' };
@@ -238,7 +238,7 @@ const scoreTier3 = (data) => {
   // Forks (moderate)
   let fk = { pts: 0, note: '', r: 0 };
   if (stars === 0) fk.note = 'No stars';
-  else { fk.r = forks / stars; if (fk.r >= 0.15) fk = { ...fk, pts: W.forks, note: 'Healthy fork engagement' }; else if (fk.r < 0.04) fk = { ...fk, pts: Math.max(0, Math.round((fk.r / 0.04) * W.forks - 10)), note: 'Low fork ratio — possible inflated stars' }; else { const n = (fk.r - 0.04) / 0.11; fk = { ...fk, pts: Math.round(n * W.forks), note: 'Moderate fork engagement' }; } }
+  else { fk.r = forks / stars; if (fk.r >= 0.15) fk = { ...fk, pts: W.forks, note: 'Healthy fork engagement' }; else if (fk.r < 0.04) fk = { ...fk, pts: Math.max(0, Math.round((fk.r / 0.04) * W.forks - 10)), note: 'Low fork ratio — possible inflated stars' }; else { const n = (fk.r - 0.04) / 0.11; fk = { ...fk, pts: Math.round((W.forks - 10) + n * 10), note: 'Moderate fork engagement' }; } }
 
   // Commits
   let cm = { pts: 0, note: '' };
@@ -283,7 +283,7 @@ const scoreTier4 = (data) => {
     fk.r = forks / stars;
     if (fk.r >= 0.20) fk = { ...fk, pts: W.forks, note: 'Healthy organic fork engagement' };
     else if (fk.r < 0.05) fk = { ...fk, pts: Math.max(0, Math.round((fk.r / 0.05) * W.forks - 20)), note: 'Very low fork ratio — possible fake stars' };
-    else { const n = (fk.r - 0.05) / 0.15; fk = { ...fk, pts: Math.round(n * W.forks), note: 'Moderate fork engagement' }; }
+    else { const n = (fk.r - 0.05) / 0.15; fk = { ...fk, pts: Math.round((W.forks - 20) + n * 20), note: 'Moderate fork engagement' }; }
   }
 
   // Commits
