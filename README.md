@@ -54,7 +54,7 @@ If you prefer to inspect the code or build it manually:
 * Step 1: Clone this repository locally (`git clone https://github.com/ahmedthebest31/gh-integrity-guard.git`).
 * Step 2: Open your browser's extension management page (`chrome://extensions` or `about:debugging` in Firefox).
 * Step 3: Enable **Developer Mode**.
-* Step 4: Click **Load Unpacked** (or **Load Temporary Add-on**) and select the cloned project folder.
+* Step 4: Click **Load Unpacked** (or **Load Temporary Add-on**) and select the `src` folder inside the cloned project.
 
 ---
 
