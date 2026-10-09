@@ -1,106 +1,107 @@
-# 🛡️ GitHub Integrity Guard
+# GitHub Integrity Guard
 
-[![GitHub License](https://img.shields.io/github/license/ahmedthebest31/gh-integrity-guard?color=green)](LICENSE)
+[![License](https://img.shields.io/github/license/ahmedthebest31/gh-integrity-guard?color=brightgreen)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
-[![A11y Compliant](https://img.shields.io/badge/Accessibility-100%25-blue)](README.md)
+[![Chrome Web Store](https://img.shields.io/badge/Chrome_Web_Store-Install-1a73e8?logo=chrome&logoColor=white)](https://chromewebstore.google.com/detail/github-integrity-guard/ffmjlnmfgggbfpiidebpfdehfipehcla)
+[![Firefox Add-ons](https://img.shields.io/badge/Firefox_Add--ons-Install-ff7139?logo=firefox&logoColor=white)](https://addons.mozilla.org/firefox/addon/github-integrity-guard/)
 
-GitHub Integrity Guard is an advanced, privacy-first browser extension architected to eliminate star-farming deception. It injects a real-time, highly accessible scorecard directly into GitHub repositories, analyzing authentic community health and protecting independent developers from bot-driven metrics.
+GitHub Integrity Guard is a browser extension that shows a clear trust score from 0 to 100 on every GitHub repository you visit. It reads public repository data through the official GitHub API, calculates the score entirely inside your browser, and shows the result in the repository sidebar (or as a floating card when the sidebar is missing).
 
----
+The whole point is simple: star counts are easy to fake, so we look past them. The score is built from four measurable signals:
 
-## ⚙️ How It Works (The Engine & UI)
+- the ratio of forks to stars,
+- commit activity over the last 90 days,
+- how quickly issues get closed,
+- and how much real community discussion is going on.
 
-The extension acts as a silent auditor working directly within your browser, ensuring maximum transparency without cluttering your workflow:
-
-* 🧠 **100% AI-Free & Deterministic:** No black-box AI algorithms, no LLM hallucinations, and no API bloat. Just pure, transparent mathematical logic.
-* 🔑 **Optional Token Boost:** Works out of the box on GitHub's free API limit. Add a Personal Access Token (PAT) to raise the limit to 5,000 requests per hour; it is encrypted locally via AES-GCM and never leaves your machine.
-* 💉 **Smart UI Injection:** The extension seamlessly injects a clean Scorecard into the native GitHub sidebar. If the sidebar is missing, a resilient **Floating Card** automatically appears.
-* 🚦 **Visual Transparency:** The card displays a definitive Trust Score (out of 100) using a traffic-light color system: **Red (Danger)**, **Yellow (Warning)**, and **Green (Healthy)**.
-* 📊 **Full Breakdown:** It exposes the raw numbers underneath the score (Fork-to-Star ratio, 90-day Commits, Issue Health, and Discussion Depth).
-* 💾 **24-Hour Smart Cache:** Successful audits are cached locally for 24 hours, which keeps the free 60 requests/hour limit healthy. Visiting the same repository twice won't trigger redundant network requests.
+There is no AI anywhere in this project. No black-box models, no guesswork, no tracking, no servers. The same repository always gets the same score, and every number behind it can be checked by hand on the repository page.
 
 ---
 
-## ♿ Uncompromised Accessibility 
+## How the score works
 
-Built by a blind software engineer, this tool actively rejects cluttered charts in favor of pure semantic data:
+The score uses a fixed, transparent formula with four tiers, so small or new projects are never punished for not having thousands of stars:
 
-* 🔊 **Instant Audio Briefing:** The moment a repository loads, a visually-hidden `aria-live` region reads a concise summary of the Trust Score directly to your screen reader.
-* 📋 **Accessible Export:** A dedicated native button allows you to copy the entire metrics breakdown to your clipboard with an instant audio confirmation.
-* ⌨️ **Keyboard Native:** Every element, from the floating card dismissal to the options page, is strictly navigable via keyboard.
+- Tier 1 (Incubator, under 200 stars) — small and new projects are trusted by default and only penalized if they are completely dormant for more than a year.
+- Tier 2 (Growth, 200 to 5,000 stars) — focused on activity. Rewards a steady commit cadence and healthy issue discussions over raw fork counts.
+- Tier 3 (Established, 5,000 to 10,000 stars) — balanced check of community adoption and ongoing work.
+- Tier 4 (High-Traffic, over 10,000 stars) — the strictest rules. If the fork-to-star ratio drops below 3%, the score is capped at 30 to catch inflated metrics.
 
----
-
-## 🧮 The Tiered Scoring Architecture
-
-To prevent penalizing new or niche projects, the algorithm dynamically adjusts its rules based on the repository's total stars:
-
-* 🌱 **Tier 1 (Incubator | < 200 Stars):** Baseline 90+ score. Focuses purely on absolute stagnation (penalized only if dormant for > 365 days).
-* 📈 **Tier 2 (Growth | 200 - 5,000 Stars):** Pulse-focused auditing. Rewards active commit cadence and community issue discussions over raw fork numbers.
-* 🏛️ **Tier 3 (Established | 5,000 - 10,000 Stars):** Balanced auditing. Matches organic community adoption with the project's growing popularity.
-* 🐋 **Tier 4 (High-Traffic | > 10,000 Stars):** Strict anti-fraud enforcement. Hard-caps scores at 30 (Danger Zone) if the fork ratio falls below 3% to kill bot farms.
+The result is color-coded: red under 40 (danger), yellow up to 70 (warning), and green above that (healthy). Successful audits are cached locally for 24 hours, so revisiting the same repository does not burn extra requests from your GitHub quota.
 
 ---
 
-## 📥 Installation
+## Accessibility
 
-### 🌐 Official Stores (Recommended)
-You can install GitHub Integrity Guard directly from your browser's official web store:
-* **Google Chrome / Microsoft Edge:** [Install from Chrome Web Store](https://chromewebstore.google.com/detail/github-integrity-guard/ffmjlnmfgggbfpiidebpfdehfipehcla)
-* **Mozilla Firefox:** [Install from Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/github-integrity-guard/)
+The extension is built for screen readers first — it is written by a blind developer, and every design choice follows from that:
 
-### 🛠️ Build From Source (For Developers)
-If you prefer to inspect the code or build it manually:
-* Step 1: Clone this repository locally (`git clone https://github.com/ahmedthebest31/gh-integrity-guard.git`).
-* Step 2: Open your browser's extension management page (`chrome://extensions` or `about:debugging` in Firefox).
-* Step 3: Enable **Developer Mode**.
-* Step 4: Click **Load Unpacked** (or **Load Temporary Add-on**) and select the `src` folder inside the cloned project.
+- When a repository loads, a visually-hidden aria-live region reads a short summary of the score to your screen reader.
+- The floating card can be dismissed and opened entirely from the keyboard.
+- A dedicated button copies the full metrics breakdown to the clipboard and confirms the copy out loud.
+- No charts, no graphs, no images — the card is plain text that a screen reader can read top to bottom.
 
 ---
 
----
+## Install
 
-## 🖼️ Store Listing Assets
+### From the official stores
 
-All assets used to publish the extension on the Chrome Web Store and Firefox Add-ons live in the `store/` folder:
+<a href="https://chromewebstore.google.com/detail/github-integrity-guard/ffmjlnmfgggbfpiidebpfdehfipehcla" style="display:inline-block;margin:4px 12px 4px 0;padding:12px 22px;background:#1a73e8;color:#ffffff;border-radius:8px;font-weight:600;text-decoration:none;">Install for Chrome</a> <a href="https://addons.mozilla.org/firefox/addon/github-integrity-guard/" style="display:inline-block;margin:4px 0;padding:12px 22px;background:#c43a16;color:#ffffff;border-radius:8px;font-weight:600;text-decoration:none;">Install for Firefox</a>
 
-* `store/STORE_LISTING.md` — Title, summary, and full listing copy for both stores.
-* `store/icon-128.png` / `store/icon-512.png` — Official extension icons.
-* `store/promo-440x280.png` — Required Chrome Web Store promo tile.
-* `store/screenshots/` — Five store-ready 1280x800 screenshots (full page plus one card per scoring tier).
-* `store/originals/` — Highest-quality 2x source captures used to build the resized store screenshots.
+### From source
 
----
+If you prefer to inspect or build the code yourself:
 
-## 🔑 Setup & Privacy (Zero Telemetry)
-
-No setup required. The extension audits repositories immediately using GitHub's free public API limit (60 requests per hour, kept low via 24-hour local caching). A token is optional and only raises the limit to 5,000 requests per hour.
-
-* **Step 1 (Optional — Generate):** You can skip this for zero-config use, or retrieve your existing token via terminal by running `gh auth token`, or generate a new minimal-scope token from your GitHub Developer Settings.
-* **Step 2 (Optional — Configure):** Open the extension's **Options** page (right-click the extension icon and select Options), paste your token, and save.
-* **🔒 Military-Grade Local Encryption:** Your token is immediately encrypted locally using industry-standard AES-GCM via the native Web Crypto API. 
-* **🚫 Zero Telemetry:** Your data never leaves your device. We do not track you, we do not collect analytics, and there are zero external servers involved. Everything is stored locally in your browser.
-* **🗑️ Full Control:** You can permanently delete or update your encrypted token at any time directly from the Options page.
-
-## 🗺️ Roadmap
-
-* 👤 **Human Verification Layer:** Adding a community reporting feature to manually flag repositories with inaccurate scores to train and refine the grading algorithm.
-* 🌍 **Localization:** Multi-language support for screen reader narrations (including Arabic).
+1. Clone this repository locally.
+2. Open your browser's extension management page (chrome://extensions, or about:debugging in Firefox).
+3. Enable Developer Mode.
+4. Click Load Unpacked (or Load Temporary Add-on) and select the `src` folder inside the cloned project.
 
 ---
 
-## 🤝 Contributing
+## Privacy
 
-Contributions are completely open! Whether you want to optimize the algorithms, fix a bug, enhance the UI, or improve documentation, your Pull Requests are highly welcome. Please ensure your commits adhere to the Conventional Commits specification.
+The extension works without any account or setup. An optional GitHub Personal Access Token only raises your API limit from 60 to 5,000 requests per hour:
+
+- The token is encrypted locally with AES-GCM using the browser's native Web Crypto API and never leaves your machine.
+- You can update or permanently delete it anytime from the Options page.
+- There is no telemetry, no analytics, and no server of ours. Nothing is collected.
+
+See [PRIVACY.md](PRIVACY.md) for the full policy.
 
 ---
 
-## 📜 License
+## Store listing assets
 
-This project is open-source and licensed under the terms of the **MIT License**. See the `LICENSE` file for more details.
+Everything used to publish the extension on the Chrome Web Store and Firefox Add-ons lives in the `store/` folder:
+
+- `store/STORE_LISTING.md` — the listing copy for both stores.
+- `store/icon-128.png` and `store/icon-512.png` — the official icons.
+- `store/promo-440x280.png` — the Chrome Web Store promo tile.
+- `store/screenshots/` — five 1280x800 screenshots (one full page plus one card per scoring tier).
+- `store/originals/` — the high-resolution 2x captures the screenshots were resized from.
 
 ---
 
-## ✉️ A Message from the Developer
+## Roadmap
 
-As a blind software engineer, the open-source community is my absolute lifeline. Projects like the [NVDA screen reader](https://www.nvaccess.org/) are the fundamental reason I can use a computer and write code every day. I built this extension to give back to this incredible ecosystem and keep it clean from bot manipulation. Going entirely against the current trend, this tool is strictly AI-free—relying solely on pure math, deterministic logic, and zero-chart accessibility to ensure independent creators get the fair exposure they deserve.
+- A community reporting layer so inaccurate scores can be flagged manually.
+- Localization of the screen-reader announcements, including Arabic.
+
+---
+
+## Contributing
+
+Pull requests are welcome. Keep the accessibility bar high: no non-semantic charts, and every change must remain fully navigable by keyboard and screen reader. Please follow the [Conventional Commits](https://www.conventionalcommits.org/) specification. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+
+---
+
+### 📄 License
+
+[GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.html) — see the [LICENSE](LICENSE) file for details.
+
+---
+
+## A note from the developer
+
+Being a blind engineer, the open-source community is what makes it possible for me to write code at all — NVDA is the reason I can use a computer the way I do every day. This extension is my way of giving back and keeping GitHub honest, one repository at a time. That is why it is deliberately AI-free: pure math, deterministic rules, and numbers anyone can read.
