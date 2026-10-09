@@ -111,6 +111,17 @@
             background-color: var(--color-btn-hover-bg);
         }
 
+        .btn-secondary {
+            color: var(--color-fg-default);
+            background-color: transparent;
+            border-color: var(--color-border-default);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--color-border-default);
+            border-color: var(--color-fg-default);
+        }
+
         .btn-danger {
             color: var(--color-danger-fg);
             background-color: transparent;
@@ -181,6 +192,7 @@
             <div class="actions">
                 <button type="submit" id="save-btn" class="btn btn-primary" aria-label="Save Personal Access Token">Save Token</button>
                 <button type="button" id="delete-btn" class="btn btn-danger" aria-label="Delete Personal Access Token" style="display: none;">Delete Token</button>
+                <button type="button" id="token-link-btn" class="btn btn-secondary" aria-label="Open GitHub page to create a new Personal Access Token">Create a Token</button>
             </div>
             
             <div id="status-message" class="status" role="alert" aria-live="polite"></div>

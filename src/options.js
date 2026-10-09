@@ -2,13 +2,25 @@ import { encryptData, getWithExpiry, setWithExpiry } from './storage.js';
 
 const PAT_CACHE_KEY = 'gh_integrity_pat';
 const TEN_YEARS_IN_MINUTES = 10 * 365 * 24 * 60; // Long TTL for token
+const GITHUB_TOKEN_URL = 'https://github.com/settings/tokens/new';
+
+const openTokenPage = () => {
+  if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.create) {
+    chrome.tabs.create({ url: GITHUB_TOKEN_URL });
+    return;
+  }
+  window.open(GITHUB_TOKEN_URL, '_blank', 'noopener,noreferrer');
+};
 
 document.addEventListener('DOMContentLoaded', () => {
     const patInput = document.getElementById('pat-input');
     const saveBtn = document.getElementById('save-btn');
     const deleteBtn = document.getElementById('delete-btn');
+    const tokenLinkBtn = document.getElementById('token-link-btn');
     const statusMessage = document.getElementById('status-message');
     const form = document.getElementById('options-form');
+
+    if (tokenLinkBtn) tokenLinkBtn.addEventListener('click', openTokenPage);
 
     /**
      * Displays a status message to the user.

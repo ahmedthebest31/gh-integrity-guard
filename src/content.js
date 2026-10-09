@@ -8,6 +8,7 @@
 const INTEGRITY_CARD_ID = 'gh-integrity-guard-card';
 const SIDEBAR_WAIT_MS = 3000;
 const SMALL_SCREEN_PX = 768;
+const GITHUB_TOKEN_URL = 'https://github.com/settings/tokens/new';
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
@@ -109,6 +110,47 @@ const CARD_STYLES = {
     font-weight: 600;
     text-align: center;
   `,
+  errorBox: `
+    display: none;
+    background-color: var(--color-danger-subtle, rgba(255,129,130,0.1));
+    border: 1px solid var(--color-danger-emphasis, #f85149);
+    border-radius: 6px;
+    padding: 12px;
+    margin-top: 10px;
+  `,
+  errorTitle: `
+    margin: 0 0 6px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-danger-fg, #ff7b72);
+  `,
+  errorDesc: `
+    margin: 0 0 12px 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--color-fg-default, #c9d1d9);
+  `,
+  errorActions: `
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  `,
+  actionBtn: `
+    border: 1px solid var(--color-border-default, #30363d);
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--color-fg-default, #c9d1d9);
+    background-color: var(--color-canvas-default, #0d1117);
+    transition: border-color 0.2s ease, color 0.2s ease;
+  `,
+  actionBtnPrimary: `
+    color: #ffffff;
+    background-color: var(--color-success-emphasis, #2da44e);
+    border-color: rgba(27, 31, 36, 0.15);
+  `,
 };
 
 // ─── Clipboard SVG icon ──────────────────────────────────────────────────────
@@ -143,10 +185,19 @@ const createIntegrityCard = (isFloating = false) => {
         </span>
       </h2>
 
-      <div style="${CARD_STYLES.scoreBox}">
+      <div data-ig-score-box style="${CARD_STYLES.scoreBox}">
         <span data-ig-score style="${CARD_STYLES.scoreValue}">--/100</span>
         <p data-ig-label class="text-small color-fg-muted mt-1 mb-0">Analyzing repository health…</p>
         <span data-ig-tier style="${CARD_STYLES.tierBadge}; display:none;"></span>
+      </div>
+
+      <div data-ig-error style="${CARD_STYLES.errorBox}">
+        <p data-ig-error-title style="${CARD_STYLES.errorTitle}"></p>
+        <p data-ig-error-desc style="${CARD_STYLES.errorDesc}"></p>
+        <div style="${CARD_STYLES.errorActions}">
+          <button data-ig-token-btn style="${CARD_STYLES.actionBtn} ${CARD_STYLES.actionBtnPrimary}" hidden aria-label="Create a free GitHub token in a new tab">Create a free token</button>
+          <button data-ig-error-dismiss style="${CARD_STYLES.actionBtn}" aria-label="Dismiss this integrity score error">Dismiss</button>
+        </div>
       </div>
 
       <div data-ig-breakdown style="margin-top: 10px; display: none;">
@@ -180,6 +231,13 @@ const createIntegrityCard = (isFloating = false) => {
     copyBtn.addEventListener('click', () => handleCopy(card, copyBtn));
   }
 
+  // Wire error panel buttons
+  const tokenBtn = card.querySelector('[data-ig-token-btn]');
+  if (tokenBtn) tokenBtn.addEventListener('click', openTokenPage);
+
+  const dismissBtn = card.querySelector('[data-ig-error-dismiss]');
+  if (dismissBtn) dismissBtn.addEventListener('click', () => card.remove());
+
   return card;
 };
 
@@ -211,6 +269,12 @@ const handleCopy = async (card, btn) => {
   } catch {
     if (liveRegion) liveRegion.textContent = 'Failed to copy score';
   }
+};
+
+// ─── Token page helper ───────────────────────────────────────────────────────
+
+const openTokenPage = () => {
+  window.open(GITHUB_TOKEN_URL, '_blank', 'noopener,noreferrer');
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -259,12 +323,35 @@ const updateCardWithScore = (scoreData) => {
   const srSummary   = $('[data-ig-sr-summary]');
   const tierEl      = $('[data-ig-tier]');
   const tierNotesEl = $('[data-ig-tier-notes]');
+  const liveRegion  = $('[data-ig-live]');
 
   // ── Error / simple result (no breakdown) ──
   if (!scoreData.breakdown) {
-    if (scoreEl)  scoreEl.textContent = typeof scoreData.score === 'number' ? `${scoreData.score}/100` : scoreData.score;
-    if (labelEl)  labelEl.textContent = scoreData.status || '';
+    const scoreBoxEl   = $('[data-ig-score-box]');
+    const errorBoxEl   = $('[data-ig-error]');
+    const errorTitleEl = $('[data-ig-error-title]');
+    const errorDescEl  = $('[data-ig-error-desc]');
+    const tokenBtnEl   = $('[data-ig-token-btn]');
+    const dismissBtnEl = $('[data-ig-error-dismiss]');
+
+    const errorTitleText = scoreData.title || 'Audit failed';
+    const errorDescText  = scoreData.desc || '';
+
+    if (scoreEl) scoreEl.textContent = typeof scoreData.score === 'number' ? `${scoreData.score}/100` : scoreData.score;
+    if (labelEl) labelEl.textContent = errorDescText;
+
+    if (scoreBoxEl) scoreBoxEl.style.display = 'none';
+    if (errorBoxEl && errorTitleEl && errorDescEl) {
+      errorTitleEl.textContent = errorTitleText;
+      errorDescEl.textContent = errorDescText;
+      errorBoxEl.style.display = 'block';
+      if (tokenBtnEl) tokenBtnEl.hidden = !scoreData.tokenAction;
+      if (dismissBtnEl) dismissBtnEl.style.display = 'inline-block';
+    }
+
     if (statusEl) statusEl.textContent = 'Error';
+    if (srSummary) srSummary.textContent = `${errorTitleText}. ${errorDescText}`;
+    if (liveRegion) liveRegion.textContent = `${errorTitleText}. ${errorDescText}`;
     return;
   }
 
@@ -360,20 +447,55 @@ const updateCardWithScore = (scoreData) => {
 const buildErrorDisplay = (error) => {
   if (error.name === 'GitHubApiError') {
     switch (error.status) {
-      case 401: return { score: '!', status: 'Invalid token — check Options page' };
+      case 401:
+        return {
+          score: '!',
+          title: 'Authentication failed',
+          desc: 'The saved token appears to be invalid or revoked. Create a new token, or remove it from the extension Options and try again.',
+          tokenAction: true,
+        };
       case 403:
       case 429: {
-        const retry = error.retryAfter ? ` (resets in ${error.retryAfter}s)` : '';
-        const status = error.authenticated
-          ? `Rate limited${retry}`
-          : `Free GitHub limit reached${retry} — optional token in Options raises it`;
-        return { score: '!', status };
+        const retryMsg = error.retryAfter
+          ? ` The quota resets in ${error.retryAfter} seconds.`
+          : ' Please try again later.';
+        if (error.authenticated) {
+          return {
+            score: '!',
+            title: 'GitHub API rate limit reached',
+            desc: `The hourly allowance for your token is used up.${retryMsg}`,
+            tokenAction: false,
+          };
+        }
+        return {
+          score: '!',
+          title: 'GitHub free quota exhausted',
+          desc: `The extension's free allowance for this hour is used up, so this repository could not be audited.${retryMsg} Adding a free Personal Access Token raises the limit from 60 up to 5,000 requests per hour.`,
+          tokenAction: true,
+        };
       }
-      case 404: return { score: 'N/A', status: 'Repository not found' };
-      default:  return { score: '!', status: `API error (${error.status})` };
+      case 404:
+        return {
+          score: 'N/A',
+          title: 'Repository not found',
+          desc: 'This repository is private, or it may have been renamed or deleted.',
+          tokenAction: false,
+        };
+      default:
+        return {
+          score: '!',
+          title: 'Audit failed',
+          desc: `An unexpected error occurred while fetching repository data (status ${error.status}).`,
+          tokenAction: false,
+        };
     }
   }
-  return { score: '!', status: 'Unexpected error' };
+  return {
+    score: '!',
+    title: 'Audit failed',
+    desc: 'An unexpected error occurred while auditing this repository.',
+    tokenAction: false,
+  };
 };
 
 // ─── Smart injection with floating fallback ──────────────────────────────────
