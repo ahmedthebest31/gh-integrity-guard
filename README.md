@@ -58,6 +58,20 @@ If you prefer to inspect the code or build it manually:
 
 ---
 
+---
+
+## 🖼️ Store Listing Assets
+
+All assets used to publish the extension on the Chrome Web Store and Firefox Add-ons live in the `store/` folder:
+
+* `store/STORE_LISTING.md` — Title, summary, and full listing copy for both stores.
+* `store/icon-128.png` / `store/icon-512.png` — Official extension icons.
+* `store/promo-440x280.png` — Required Chrome Web Store promo tile.
+* `store/screenshots/` — Five store-ready 1280x800 screenshots (full page plus one card per scoring tier).
+* `store/originals/` — Highest-quality 2x source captures used to build the resized store screenshots.
+
+---
+
 ## 🔑 Setup & Privacy (Zero Telemetry)
 
 No setup required. The extension audits repositories immediately using GitHub's free public API limit (60 requests per hour, kept low via 24-hour local caching). A token is optional and only raises the limit to 5,000 requests per hour.

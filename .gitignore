@@ -23,6 +23,5 @@ prd.md
 st/
 token.txt
 
-# local-only dev assets (store copy + test token)
+# local-only dev assets
 dev/
-STORE_LISTING.md
