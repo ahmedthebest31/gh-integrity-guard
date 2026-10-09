@@ -378,6 +378,26 @@ const buildErrorDisplay = (error) => {
 
 // ─── Smart injection with floating fallback ──────────────────────────────────
 
+// GitHub has shipped several sidebar markup variants over time. The original
+// `.Layout-sidebar` class was replaced by CSS-module classes (e.g.
+// `CodeViewSidebar-module__borderGrid__<hash>`). The local module name
+// ("borderGrid") is stable even when the hashed suffix changes, so we match on
+// it as a fallback. Order matters: prefer the most specific selector first.
+const SIDEBAR_SELECTORS = [
+  '.Layout-sidebar',
+  '[data-component="SplitPageLayout.Pane"] [class*="borderGrid"]',
+  '[class*="CodeViewSidebar-module"][class*="borderGrid"]',
+  '[class*="borderGrid"]',
+];
+
+const findSidebar = () => {
+  for (const selector of SIDEBAR_SELECTORS) {
+    const el = document.querySelector(selector);
+    if (el) return el;
+  }
+  return null;
+};
+
 const injectCardIntoSidebar = async () => {
   const pathParts = window.location.pathname.split('/').filter(Boolean);
   if (pathParts.length < 2) return;
@@ -385,7 +405,7 @@ const injectCardIntoSidebar = async () => {
   if (document.getElementById(INTEGRITY_CARD_ID)) return;
 
   const isSmallScreen = window.innerWidth < SMALL_SCREEN_PX;
-  const sidebar = isSmallScreen ? null : document.querySelector('.Layout-sidebar');
+  const sidebar = isSmallScreen ? null : findSidebar();
   const isFloating = !sidebar;
   const card = createIntegrityCard(isFloating);
 
@@ -438,11 +458,11 @@ const init = () => {
   document.addEventListener('turbo:load', injectCardIntoSidebar);
   document.addEventListener('pjax:end', injectCardIntoSidebar);
 
-  // Smart MutationObserver: watches for .Layout-sidebar and injects once found
+  // Smart MutationObserver: watches for the sidebar and injects once found
   let observerTimeout = null;
   const observer = new MutationObserver(() => {
     if (document.getElementById(INTEGRITY_CARD_ID)) return;
-    const sidebar = document.querySelector('.Layout-sidebar');
+    const sidebar = findSidebar();
     if (sidebar) {
       clearTimeout(observerTimeout);
       injectCardIntoSidebar();
